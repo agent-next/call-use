@@ -3,18 +3,28 @@
 import asyncio
 import json
 import logging
+import os
 import time
 
-from livekit import api
-from livekit.agents import Agent, AgentSession, RunContext, function_tool
+from dotenv import load_dotenv
+from livekit import api, rtc
+from livekit.agents import (
+    Agent, AgentServer, AgentSession, JobContext, RunContext, cli, function_tool, room_io,
+)
 from livekit.agents.beta.tools import send_dtmf_events
+from livekit.plugins import deepgram, noise_cancellation, openai, silero
+from livekit.protocol.sip import CreateSIPParticipantRequest
 
 from call_use.evidence import EvidencePipeline
 from call_use.models import (
     CallEvent, CallEventType, CallStateEnum, CallTask, DispositionEnum,
 )
 
+load_dotenv()
+
 logger = logging.getLogger(__name__)
+
+SIP_TRUNK_ID = os.environ.get("SIP_TRUNK_ID", "")
 
 
 # ---------------------------------------------------------------------------
@@ -446,3 +456,148 @@ class _LiveKitCallAgent(Agent):
                 )
             except Exception:
                 logger.warning("Failed to remove SIP participant", exc_info=True)
+
+    # ---- Session lifecycle (Step 5b) ----
+
+    async def run(self, ctx: JobContext):
+        """Full call lifecycle: create session, dial SIP, wire events, wait."""
+        self._ctx = ctx
+        self._room = ctx.room
+        self._lk_api = ctx.api
+        task = self._task
+
+        # Create session with configurable voice
+        tts_voice = task.voice_id or "alloy"
+        session = AgentSession(
+            stt=deepgram.STT(model="nova-3", language="en-US"),
+            llm=openai.LLM(model="gpt-4o"),
+            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
+            vad=silero.VAD.load(),
+            turn_detection="vad",
+            min_endpointing_delay=0.6,
+        )
+
+        # Wire evidence events to call-events data channel
+        if self._evidence:
+            async def _publish_event(event: CallEvent):
+                try:
+                    await ctx.room.local_participant.publish_data(
+                        event.model_dump_json().encode(),
+                        reliable=True,
+                        topic="call-events",
+                    )
+                except Exception:
+                    logger.warning("Failed to publish event", exc_info=True)
+            self._evidence.subscribe(_publish_event)
+
+        # Emit initial state
+        await self._set_state(CallStateEnum.dialing)
+
+        # Create SIP participant (dials the phone)
+        sip_request = CreateSIPParticipantRequest(
+            sip_trunk_id=SIP_TRUNK_ID,
+            sip_call_to=task.phone_number,
+            sip_number=task.caller_id or "",
+            room_name=ctx.room.name,
+            participant_identity="phone-callee",
+            participant_name="Phone Call",
+            krisp_enabled=True,
+            wait_until_answered=True,
+        )
+        await ctx.api.sip.create_sip_participant(sip_request)
+
+        # Wait for phone participant to connect
+        participant = await ctx.wait_for_participant(identity="phone-callee")
+        self._call_start_time = time.time()
+
+        # Start session pinned to phone-callee
+        await session.start(
+            room=ctx.room,
+            agent=self,
+            room_options=room_io.RoomOptions(
+                participant_identity="phone-callee",
+                audio_input=room_io.AudioInputOptions(
+                    noise_cancellation=lambda params: (
+                        noise_cancellation.BVCTelephony()
+                        if params.participant.kind
+                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        else noise_cancellation.BVC()
+                    ),
+                ),
+            ),
+        )
+
+        logger.info(f"Agent identity: {ctx.room.local_participant.identity}")
+
+        # Timeout guard
+        timeout_task = asyncio.create_task(self._timeout_guard(task.timeout_seconds))
+
+        # Handle participant disconnect
+        @ctx.room.on("participant_disconnected")
+        def _on_participant_left(p):
+            if p.identity == "phone-callee":
+                timeout_task.cancel()
+                disp = (
+                    DispositionEnum.completed
+                    if self._call_ended_normally
+                    else DispositionEnum.failed
+                )
+                asyncio.create_task(self.finalize_and_publish(disp))
+
+        # Brief pause then greet
+        await asyncio.sleep(1)
+        await session.generate_reply(
+            instructions="Introduce yourself briefly and explain why you're calling, based on your task."
+        )
+
+    async def _timeout_guard(self, timeout_seconds: int):
+        """Cancel the call after timeout_seconds."""
+        try:
+            await asyncio.sleep(timeout_seconds)
+            logger.warning(f"Call timed out after {timeout_seconds}s")
+            await self.finalize_and_publish(DispositionEnum.timeout)
+        except asyncio.CancelledError:
+            pass
+
+
+# ---------------------------------------------------------------------------
+# Agent server and entrypoint (Step 5b)
+# ---------------------------------------------------------------------------
+
+server = AgentServer()
+
+
+@server.rtc_session(agent_name="call-use-agent")
+async def entrypoint(ctx: JobContext):
+    """Module-level entrypoint registered with LiveKit.
+    Parses metadata, creates agent, delegates to agent.run()."""
+    await ctx.connect()
+
+    meta = json.loads(ctx.job.metadata or "{}")
+    task = CallTask(
+        task_id=ctx.room.name,
+        phone_number=meta.get("phone_number", ""),
+        caller_id=meta.get("caller_id"),
+        instructions=meta.get("instructions", "Have a friendly conversation"),
+        user_info=meta.get("user_info", {}),
+        voice_id=meta.get("voice_id"),
+        approval_required=meta.get("approval_required", True),
+        timeout_seconds=meta.get("timeout_seconds", 600),
+        recording_disclaimer=meta.get("recording_disclaimer"),
+    )
+
+    if not task.phone_number:
+        logger.error("No phone_number in dispatch metadata")
+        return
+
+    agent_identity = f"agent-{task.task_id[:8]}"
+    evidence = EvidencePipeline(
+        task, room_name=ctx.room.name, agent_identity=agent_identity,
+    )
+    agent = _LiveKitCallAgent(task=task, evidence=evidence)
+    await agent.run(ctx)
+
+
+def main():
+    """CLI entrypoint for call-use-worker."""
+    cli.run_app(server)
