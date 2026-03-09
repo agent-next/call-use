@@ -301,6 +301,36 @@ class TestHangUpReasons:
 
 
 # ===========================================================================
+# Transcript hooks (Step 5c)
+# ===========================================================================
+
+class TestTranscriptHooks:
+    async def test_on_user_turn_completed_emits_callee_transcript(self):
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        agent._current_state = CallStateEnum.connected
+
+        # Simulate a new_message with text_content
+        msg = MagicMock()
+        msg.text_content = "Hello, how can I help you?"
+        await agent.on_user_turn_completed(chat_ctx=MagicMock(), new_message=msg)
+
+        assert len(evidence._transcript) == 1
+        assert evidence._transcript[0]["speaker"] == "callee"
+        assert evidence._transcript[0]["text"] == "Hello, how can I help you?"
+
+    async def test_on_user_turn_completed_no_evidence(self):
+        """Should not crash when evidence is None."""
+        agent = _make_agent()
+        agent._evidence = None
+        msg = MagicMock()
+        msg.text_content = "test"
+        # Should not raise
+        await agent.on_user_turn_completed(chat_ctx=MagicMock(), new_message=msg)
+
+
+# ===========================================================================
 # Inject handler
 # ===========================================================================
 
