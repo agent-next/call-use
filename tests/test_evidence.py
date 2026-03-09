@@ -1,0 +1,137 @@
+"""Tests for call_use.evidence.EvidencePipeline."""
+
+import asyncio
+import json
+from pathlib import Path
+from unittest.mock import AsyncMock
+
+import pytest
+
+from call_use.evidence import EvidencePipeline, LOGS_DIR
+from call_use.models import (
+    CallEvent, CallEventType, CallOutcome, CallStateEnum, CallTask, DispositionEnum,
+)
+
+
+def _make_task() -> CallTask:
+    return CallTask(phone_number="+12125551234", instructions="test")
+
+
+def _make_pipeline() -> EvidencePipeline:
+    return EvidencePipeline(task=_make_task(), room_name=None)
+
+
+# ---- Tests ----
+
+@pytest.mark.asyncio
+async def test_events_accumulate_in_order():
+    pipe = _make_pipeline()
+    await pipe.emit(CallEvent(type=CallEventType.dtmf, data={"keys": "1"}))
+    await pipe.emit(CallEvent(type=CallEventType.dtmf, data={"keys": "2"}))
+    await pipe.emit(CallEvent(type=CallEventType.dtmf, data={"keys": "3"}))
+    assert len(pipe._events) == 3
+    assert [e.data["keys"] for e in pipe._events] == ["1", "2", "3"]
+
+
+@pytest.mark.asyncio
+async def test_transcript_populates_both_lists():
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hello")
+    await pipe.emit_transcript("human", "Hi there")
+    # _transcript list
+    assert len(pipe._transcript) == 2
+    assert pipe._transcript[0]["speaker"] == "agent"
+    assert pipe._transcript[1]["text"] == "Hi there"
+    # _events list
+    assert len(pipe._events) == 2
+    assert all(e.type == CallEventType.transcript for e in pipe._events)
+
+
+@pytest.mark.asyncio
+async def test_state_change_recorded():
+    pipe = _make_pipeline()
+    await pipe.emit_state_change(CallStateEnum.created, CallStateEnum.dialing)
+    assert len(pipe._events) == 1
+    ev = pipe._events[0]
+    assert ev.type == CallEventType.state_change
+    assert ev.data["from"] == "created"
+    assert ev.data["to"] == "dialing"
+
+
+@pytest.mark.asyncio
+async def test_multiple_subscribers():
+    pipe = _make_pipeline()
+    received_a: list[CallEvent] = []
+    received_b: list[CallEvent] = []
+
+    async def sub_a(event: CallEvent):
+        received_a.append(event)
+
+    async def sub_b(event: CallEvent):
+        received_b.append(event)
+
+    pipe.subscribe(sub_a)
+    pipe.subscribe(sub_b)
+    await pipe.emit_dtmf("5")
+    assert len(received_a) == 1
+    assert len(received_b) == 1
+    assert received_a[0].data["keys"] == "5"
+
+
+@pytest.mark.asyncio
+async def test_subscriber_exception_doesnt_break():
+    pipe = _make_pipeline()
+    received: list[CallEvent] = []
+
+    async def bad_sub(event: CallEvent):
+        raise RuntimeError("boom")
+
+    async def good_sub(event: CallEvent):
+        received.append(event)
+
+    pipe.subscribe(bad_sub)
+    pipe.subscribe(good_sub)
+    await pipe.emit_dtmf("9")
+    # good_sub still received the event despite bad_sub raising
+    assert len(received) == 1
+    # pipeline itself still recorded the event
+    assert len(pipe._events) == 1
+
+
+@pytest.mark.asyncio
+async def test_finalize_returns_outcome():
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hello")
+    await pipe.emit_state_change(CallStateEnum.created, CallStateEnum.connected)
+    outcome = pipe.finalize(DispositionEnum.completed)
+    assert isinstance(outcome, CallOutcome)
+    assert outcome.disposition == DispositionEnum.completed
+    assert outcome.duration_seconds > 0
+    assert len(outcome.transcript) == 1
+    assert len(outcome.events) == 2
+    assert outcome.task_id == pipe.task.task_id
+
+
+@pytest.mark.asyncio
+async def test_finalize_writes_json(tmp_path, monkeypatch):
+    # Redirect LOGS_DIR to tmp_path so we don't pollute the real logs dir
+    monkeypatch.setattr("call_use.evidence.LOGS_DIR", tmp_path)
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hi")
+    outcome = pipe.finalize(DispositionEnum.completed)
+    log_file = tmp_path / f"{pipe.task.task_id}.json"
+    assert log_file.exists()
+    data = json.loads(log_file.read_text())
+    assert data["task_id"] == pipe.task.task_id
+    assert data["disposition"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_empty_pipeline_finalizes():
+    pipe = _make_pipeline()
+    outcome = pipe.finalize(DispositionEnum.cancelled)
+    assert isinstance(outcome, CallOutcome)
+    assert outcome.disposition == DispositionEnum.cancelled
+    assert outcome.transcript == []
+    assert outcome.events == []
+    assert outcome.duration_seconds >= 0
