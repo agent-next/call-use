@@ -96,14 +96,14 @@ class TestBuildInstructions:
         assert "Simple task" in result
         assert "User-provided info" not in result
 
-    def test_includes_recording_disclaimer(self):
+    def test_recording_disclaimer_not_in_instructions(self):
+        """Recording disclaimer is spoken via on_enter/say(), not in LLM instructions."""
         task = _make_task(
             instructions="Call about bill",
             recording_disclaimer="This call may be recorded.",
         )
         result = _build_instructions(task)
-        assert "This call may be recorded." in result
-        assert "At the start of the call" in result
+        assert "This call may be recorded." not in result
 
     def test_approval_required_true(self):
         task = _make_task(approval_required=True)
