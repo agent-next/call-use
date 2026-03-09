@@ -367,13 +367,12 @@ class _LiveKitCallAgent(Agent):
                 )
 
             if self._room and self._current_state == CallStateEnum.awaiting_approval:
+                approval_event = CallEvent(
+                    type=CallEventType.approval_request,
+                    data={"approval_id": approval_id, "details": details},
+                )
                 await self._room.local_participant.publish_data(
-                    json.dumps({
-                        "type": "approval_request",
-                        "approval_id": approval_id,
-                        "details": details,
-                        "timestamp": time.time(),
-                    }).encode("utf-8"),
+                    approval_event.model_dump_json().encode("utf-8"),
                     reliable=True,
                     topic="call-events",
                 )
@@ -410,7 +409,7 @@ class _LiveKitCallAgent(Agent):
         Args:
             reason: One of 'task_complete', 'voicemail_detected', 'cannot_proceed', 'wrong_number'
         """
-        disp = _HANG_UP_REASONS.get(reason, DispositionEnum.completed)
+        disp = _HANG_UP_REASONS.get(reason, DispositionEnum.failed)
         if disp == DispositionEnum.completed:
             self._call_ended_normally = True
         await self.finalize_and_publish(disp)
@@ -449,13 +448,18 @@ class _LiveKitCallAgent(Agent):
         # Publish call_complete event on data channel
         if self._room:
             try:
-                await self._room.local_participant.publish_data(
-                    json.dumps({
-                        "type": "call_complete",
-                        "disposition": disposition.value,
+                complete_event = CallEvent(
+                    type=CallEventType.call_complete,
+                    data=outcome.model_dump(mode="json") if outcome else {
                         "task_id": self._task.task_id,
-                        "timestamp": time.time(),
-                    }).encode("utf-8"),
+                        "transcript": [],
+                        "events": [],
+                        "duration_seconds": 0.0,
+                        "disposition": disposition.value,
+                    },
+                )
+                await self._room.local_participant.publish_data(
+                    complete_event.model_dump_json().encode("utf-8"),
                     reliable=True,
                     topic="call-events",
                 )
