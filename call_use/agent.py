@@ -233,6 +233,13 @@ class _LiveKitCallAgent(Agent):
             self.session.interrupt()
             return
 
+        # Cancel — immediate teardown
+        if cmd_type == "cancel":
+            self._cancelled = True
+            self.session.interrupt()
+            await self.finalize_and_publish(DispositionEnum.cancelled)
+            return
+
         reply_input = None
         async with self._cmd_lock:
             if cmd_type == "resume":
@@ -514,10 +521,32 @@ class _LiveKitCallAgent(Agent):
             krisp_enabled=True,
             wait_until_answered=True,
         )
-        await ctx.api.sip.create_sip_participant(sip_request)
+        try:
+            await ctx.api.sip.create_sip_participant(sip_request)
+        except Exception as e:
+            error_msg = str(e).lower()
+            if "busy" in error_msg:
+                disp = DispositionEnum.busy
+            elif "no answer" in error_msg or "timeout" in error_msg:
+                disp = DispositionEnum.no_answer
+            elif "voicemail" in error_msg:
+                disp = DispositionEnum.voicemail
+            else:
+                disp = DispositionEnum.failed
+            if self._evidence:
+                await self._evidence.emit_error("dial_failed", str(e))
+            await self.finalize_and_publish(disp)
+            return
 
         # Wait for phone participant to connect
-        participant = await ctx.wait_for_participant(identity="phone-callee")
+        try:
+            participant = await asyncio.wait_for(
+                ctx.wait_for_participant(identity="phone-callee"),
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await self.finalize_and_publish(DispositionEnum.no_answer)
+            return
         self._call_start_time = time.time()
 
         # Start session pinned to phone-callee
@@ -563,11 +592,22 @@ class _LiveKitCallAgent(Agent):
         def _on_participant_left(p):
             if p.identity == "phone-callee":
                 timeout_task.cancel()
-                disp = (
-                    DispositionEnum.completed
-                    if self._call_ended_normally
-                    else DispositionEnum.failed
-                )
+                if self._cancelled:
+                    return  # Already finalized by cancel handler
+                duration = time.time() - self._call_start_time
+                if duration < 3:
+                    disp = DispositionEnum.failed  # Immediate disconnect
+                elif self._call_ended_normally:
+                    disp = DispositionEnum.completed
+                else:
+                    disp = DispositionEnum.failed  # Mid-call drop
+                    if self._evidence:
+                        asyncio.create_task(
+                            self._evidence.emit_error(
+                                "mid_call_drop",
+                                f"Call dropped after {duration:.0f}s",
+                            )
+                        )
                 asyncio.create_task(self.finalize_and_publish(disp))
 
         # Brief pause then greet
