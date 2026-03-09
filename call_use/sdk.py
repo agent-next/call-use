@@ -137,52 +137,54 @@ class CallAgent:
         ))
         await room.connect(os.environ["LIVEKIT_URL"], sdk_token.to_jwt())
 
-        # Dispatch agent
-        metadata = json.dumps(task.model_dump(mode="json"))
-        async with LiveKitAPI() as lkapi:
-            await lkapi.agent_dispatch.create_dispatch(
-                api.CreateAgentDispatchRequest(
-                    agent_name="call-use-agent",
-                    room=room_name,
-                    metadata=metadata,
-                )
-            )
-
-        # Wait for call to complete
         try:
-            await asyncio.wait_for(
-                call_complete.wait(), timeout=self._timeout_seconds + 30
-            )
-        except asyncio.TimeoutError:
-            pass
-
-        outcome = outcome_holder[0]
-
-        # Fallback: read from room metadata
-        if outcome is None:
-            try:
-                async with LiveKitAPI() as lkapi:
-                    rooms_resp = await lkapi.room.list_rooms(
-                        api.ListRoomsRequest(names=[room_name])
+            # Dispatch agent
+            metadata = json.dumps(task.model_dump(mode="json"))
+            async with LiveKitAPI() as lkapi:
+                await lkapi.agent_dispatch.create_dispatch(
+                    api.CreateAgentDispatchRequest(
+                        agent_name="call-use-agent",
+                        room=room_name,
+                        metadata=metadata,
                     )
-                    if rooms_resp.rooms and rooms_resp.rooms[0].metadata:
-                        meta = json.loads(rooms_resp.rooms[0].metadata)
-                        if "outcome" in meta:
-                            outcome = CallOutcome(**meta["outcome"])
-            except Exception:
-                logger.warning("Failed to read outcome from metadata", exc_info=True)
+                )
 
-        if outcome is None:
-            outcome = CallOutcome(
-                task_id=task.task_id,
-                transcript=[],
-                events=[],
-                duration_seconds=time.time() - start_time,
-                disposition=DispositionEnum.timeout,
-            )
+            # Wait for call to complete
+            try:
+                await asyncio.wait_for(
+                    call_complete.wait(), timeout=self._timeout_seconds + 30
+                )
+            except asyncio.TimeoutError:
+                pass
 
-        await room.disconnect()
-        return outcome
+            outcome = outcome_holder[0]
+
+            # Fallback: read from room metadata
+            if outcome is None:
+                try:
+                    async with LiveKitAPI() as lkapi:
+                        rooms_resp = await lkapi.room.list_rooms(
+                            api.ListRoomsRequest(names=[room_name])
+                        )
+                        if rooms_resp.rooms and rooms_resp.rooms[0].metadata:
+                            meta = json.loads(rooms_resp.rooms[0].metadata)
+                            if "outcome" in meta:
+                                outcome = CallOutcome(**meta["outcome"])
+                except Exception:
+                    logger.warning("Failed to read outcome from metadata", exc_info=True)
+
+            if outcome is None:
+                outcome = CallOutcome(
+                    task_id=task.task_id,
+                    transcript=[],
+                    events=[],
+                    duration_seconds=time.time() - start_time,
+                    disposition=DispositionEnum.timeout,
+                )
+
+            return outcome
+        finally:
+            await room.disconnect()
 
     async def takeover(self) -> str:
         """Request human takeover. Returns JWT token for human to join the room."""
