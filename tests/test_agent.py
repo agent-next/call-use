@@ -34,6 +34,8 @@ for mod in [
     "livekit.plugins", "livekit.plugins.openai",
     "livekit.plugins.deepgram", "livekit.plugins.silero",
     "livekit.plugins.noise_cancellation",
+    "livekit.protocol", "livekit.protocol.sip",
+    "dotenv",
 ]:
     sys.modules.setdefault(mod, MagicMock() if mod != "livekit.agents" else _livekit_agents_mock)
 
