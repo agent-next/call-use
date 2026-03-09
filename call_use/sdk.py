@@ -105,7 +105,8 @@ class CallAgent:
             event = CallEvent(**event_data)
 
             if self._on_event:
-                self._on_event(event)
+                loop = asyncio.get_event_loop()
+                loop.run_in_executor(None, self._on_event, event)
 
             if event.type == CallEventType.call_complete:
                 outcome_holder[0] = CallOutcome(**event.data)
