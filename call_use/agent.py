@@ -204,6 +204,16 @@ class _LiveKitCallAgent(Agent):
         await self._set_state(CallStateEnum.connected)
         await self._update_metadata("connected")
 
+    # ---- Transcript hooks (Step 5c) ----
+
+    async def on_user_turn_completed(
+        self, chat_ctx, new_message,
+    ):
+        """Called by LiveKit when user (callee) speech is committed to history."""
+        text = new_message.text_content if hasattr(new_message, "text_content") else str(new_message)
+        if text and self._evidence:
+            await self._evidence.emit_transcript("callee", text)
+
     # ---- Data message routing ----
 
     async def _on_data_received(self, data_packet):
@@ -528,6 +538,22 @@ class _LiveKitCallAgent(Agent):
         )
 
         logger.info(f"Agent identity: {ctx.room.local_participant.identity}")
+
+        # Wire agent speech into evidence (Step 5c)
+        if self._evidence:
+            @session.on("agent_speech_committed")
+            def _on_agent_speech(msg):
+                text = msg.text_content if hasattr(msg, "text_content") else str(msg)
+                if text:
+                    asyncio.create_task(self._evidence.emit_transcript("agent", text))
+
+            @session.on("function_tools_executed")
+            def _on_tools_executed(ev):
+                for call in getattr(ev, "function_calls", []):
+                    if getattr(call, "name", "") == "send_dtmf_events":
+                        keys = (call.arguments or {}).get("keys", "")
+                        if keys:
+                            asyncio.create_task(self._evidence.emit_dtmf(keys))
 
         # Timeout guard
         timeout_task = asyncio.create_task(self._timeout_guard(task.timeout_seconds))
