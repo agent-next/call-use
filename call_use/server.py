@@ -101,9 +101,10 @@ def create_app(api_key: str | None = None) -> FastAPI:
             raise HTTPException(400, str(e))
 
         # Validate caller_id
-        if req.caller_id:
+        caller_id = req.caller_id
+        if caller_id:
             try:
-                validate_caller_id(req.caller_id)
+                caller_id = validate_caller_id(caller_id)
             except ValueError as e:
                 raise HTTPException(400, str(e))
 
@@ -113,7 +114,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
 
         metadata = json.dumps({
             "phone_number": phone_number,
-            "caller_id": req.caller_id,
+            "caller_id": caller_id,
             "instructions": req.instructions,
             "user_info": req.user_info,
             "voice_id": req.voice_id,
