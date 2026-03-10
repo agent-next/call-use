@@ -153,22 +153,6 @@ class _LiveKitCallAgent(Agent):
 
     # ---- Lifecycle hooks ----
 
-    async def on_enter(self):
-        """Called when agent is added to session. Generates the initial greeting."""
-        await self._set_state(CallStateEnum.connected)
-        await self._update_metadata("connected")
-
-        # Recording disclaimer goes first via say() (skips LLM, straight to TTS)
-        if self._task.recording_disclaimer:
-            await self.session.say(self._task.recording_disclaimer, allow_interruptions=False)
-
-        # Context-aware greeting — uninterruptible for AEC calibration
-        await self.session.generate_reply(
-            instructions="Greet the person who answered. Say hi, give your first name, "
-            "and in one sentence explain why you're calling. Be natural and brief.",
-            allow_interruptions=False,
-        )
-
     # ---- State helpers ----
 
     async def _set_state(self, new_state: CallStateEnum):
@@ -208,6 +192,7 @@ class _LiveKitCallAgent(Agent):
         """Called by LiveKit when agent session starts.
 
         INVARIANT: Install data handler BEFORE publishing metadata.
+        Then greet the callee.
         """
         if self._room is None:
             return
@@ -224,6 +209,17 @@ class _LiveKitCallAgent(Agent):
         self._room.on("data_received", _handle_data)
         await self._set_state(CallStateEnum.connected)
         await self._update_metadata("connected")
+
+        # Recording disclaimer goes first via say() (skips LLM, straight to TTS)
+        if self._task.recording_disclaimer:
+            await self.session.say(self._task.recording_disclaimer, allow_interruptions=False)
+
+        # Context-aware greeting — uninterruptible for AEC calibration
+        await self.session.generate_reply(
+            instructions="Greet the person who answered. Say hi, give your first name, "
+            "and in one sentence explain why you're calling. Be natural and brief.",
+            allow_interruptions=False,
+        )
 
     # ---- Transcript hooks (Step 5c) ----
 
