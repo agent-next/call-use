@@ -634,6 +634,9 @@ class _LiveKitCallAgent(Agent):
 
         # Initial greeting — called AFTER session.start(), NOT in on_enter()
         # (on_enter generate_reply is known to produce inaudible output — issue #2710)
+        # NOTE: generate_reply() returns a SpeechHandle (not a coroutine).
+        # Not awaiting = fire-and-forget (agent speaks while pipeline listens).
+        # This matches the official LiveKit outbound call example pattern.
         session.generate_reply(
             instructions="Greet the person who answered. Say hi, give your first name, "
             "and in one sentence explain why you're calling. Be natural and brief."

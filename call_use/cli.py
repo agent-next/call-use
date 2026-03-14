@@ -40,8 +40,9 @@ def _event_printer(event: CallEvent):
         click.echo(f"  APPROVAL NEEDED: {details}", err=True)
 
 
-def _stdin_approval_handler(details: str) -> str:
+def _stdin_approval_handler(data: dict) -> str:
     """Interactive approval handler — prompts user on stdin."""
+    details = data.get("details", str(data)) if isinstance(data, dict) else str(data)
     click.echo(f"\n  APPROVAL NEEDED: {details}", err=True)
     response = click.prompt("  Approve? [y/n]", type=click.Choice(["y", "n"]), err=True)
     return "approved" if response == "y" else "rejected"
