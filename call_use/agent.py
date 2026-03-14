@@ -12,7 +12,7 @@ from livekit.agents import (
     Agent, AgentServer, AgentSession, JobContext, RunContext, cli, function_tool, room_io,
 )
 from livekit.agents.beta.tools import send_dtmf_events
-from livekit.plugins import deepgram, noise_cancellation, openai, silero
+from livekit.plugins import noise_cancellation, openai, silero
 from livekit.protocol.sip import CreateSIPParticipantRequest
 
 from call_use.evidence import EvidencePipeline
@@ -507,7 +507,7 @@ class _LiveKitCallAgent(Agent):
         # Create session with configurable voice
         tts_voice = task.voice_id or "alloy"
         session = AgentSession(
-            stt=deepgram.STT(model="nova-3", language="en-US"),
+            stt=openai.STT(model="whisper-1", language="en"),
             llm=openai.LLM(model="gpt-4o"),
             tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
             vad=silero.VAD.load(),

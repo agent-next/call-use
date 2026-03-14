@@ -20,7 +20,7 @@ print(outcome.transcript)    # [{"speaker": "callee", "text": "How can I help?"}
 ## What it does
 
 - **Dials outbound** via Twilio SIP trunk through LiveKit
-- **Talks** using Deepgram STT + OpenAI GPT-4o + GPT-4o-mini TTS
+- **Talks** using OpenAI Whisper STT + GPT-4o + GPT-4o-mini TTS
 - **Reports** structured `CallOutcome` with transcript, events, and disposition
 - **Human takeover** — pause the agent mid-call and take over the conversation
 - **Approval flow** — agent asks for user approval before taking sensitive actions
@@ -52,8 +52,7 @@ Two processes:
 - Python 3.11+
 - [LiveKit Cloud](https://livekit.io) or self-hosted LiveKit server
 - Twilio SIP trunk connected to LiveKit
-- OpenAI API key (for LLM + TTS)
-- Deepgram API key (for STT)
+- OpenAI API key (for STT + LLM + TTS)
 
 ### Install
 
@@ -76,8 +75,7 @@ Required environment variables:
 | `LIVEKIT_API_KEY` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `SIP_TRUNK_ID` | Twilio SIP trunk ID in LiveKit |
-| `OPENAI_API_KEY` | OpenAI API key |
-| `DEEPGRAM_API_KEY` | Deepgram API key |
+| `OPENAI_API_KEY` | OpenAI API key (STT + LLM + TTS) |
 
 ### Run the worker
 
@@ -183,8 +181,7 @@ Native tool integration for Claude Code, Codex, and other MCP-compatible agents:
         "LIVEKIT_API_KEY": "...",
         "LIVEKIT_API_SECRET": "...",
         "SIP_TRUNK_ID": "...",
-        "OPENAI_API_KEY": "...",
-        "DEEPGRAM_API_KEY": "..."
+        "OPENAI_API_KEY": "..."
       }
     }
   }
