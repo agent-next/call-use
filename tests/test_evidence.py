@@ -1,15 +1,17 @@
 """Tests for call_use.evidence.EvidencePipeline."""
 
-import asyncio
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock
 
 import pytest
 
-from call_use.evidence import EvidencePipeline, LOGS_DIR
+from call_use.evidence import EvidencePipeline
 from call_use.models import (
-    CallEvent, CallEventType, CallOutcome, CallStateEnum, CallTask, DispositionEnum,
+    CallEvent,
+    CallEventType,
+    CallOutcome,
+    CallStateEnum,
+    CallTask,
+    DispositionEnum,
 )
 
 
@@ -22,6 +24,7 @@ def _make_pipeline() -> EvidencePipeline:
 
 
 # ---- Tests ----
+
 
 @pytest.mark.asyncio
 async def test_events_accumulate_in_order():
@@ -118,12 +121,23 @@ async def test_finalize_writes_json(tmp_path, monkeypatch):
     monkeypatch.setattr("call_use.evidence.LOGS_DIR", tmp_path)
     pipe = _make_pipeline()
     await pipe.emit_transcript("agent", "Hi")
-    outcome = pipe.finalize(DispositionEnum.completed)
+    pipe.finalize(DispositionEnum.completed)
     log_file = tmp_path / f"{pipe.task.task_id}.json"
     assert log_file.exists()
     data = json.loads(log_file.read_text())
     assert data["task_id"] == pipe.task.task_id
     assert data["disposition"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_finalize_twice_is_safe():
+    """Calling finalize twice should not crash or duplicate."""
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hello")
+    outcome1 = pipe.finalize(DispositionEnum.completed)
+    outcome2 = pipe.finalize(DispositionEnum.failed)
+    # Both calls should succeed and share the same task_id
+    assert outcome1.task_id == outcome2.task_id
 
 
 @pytest.mark.asyncio

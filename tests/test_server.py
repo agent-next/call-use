@@ -7,7 +7,10 @@ import pytest
 
 # Mock livekit modules before importing server
 for mod in [
-    "livekit", "livekit.api", "livekit.protocol", "livekit.protocol.models",
+    "livekit",
+    "livekit.api",
+    "livekit.protocol",
+    "livekit.protocol.models",
     "dotenv",
 ]:
     sys.modules.setdefault(mod, MagicMock())
@@ -36,12 +39,14 @@ lk_api_mod.ListParticipantsRequest = MagicMock
 lk_api_mod.SendDataRequest = MagicMock
 lk_api_mod.UpdateRoomMetadataRequest = MagicMock
 
-import os
+import os  # noqa: E402
+
 os.environ.setdefault("LIVEKIT_API_KEY", "test-key")
 os.environ.setdefault("LIVEKIT_API_SECRET", "test-secret")
 
-from call_use.server import create_app
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient  # noqa: E402
+
+from call_use.server import create_app  # noqa: E402
 
 API_KEY = "test-api-key-12345"
 
@@ -60,6 +65,7 @@ def headers():
 # ===========================================================================
 # 1: POST /calls with valid phone → 200
 # ===========================================================================
+
 
 class TestCreateCallValid:
     def test_valid_phone_returns_200(self, client, headers):
@@ -93,6 +99,7 @@ class TestCreateCallValid:
 # 2: POST /calls with invalid phone → 400
 # ===========================================================================
 
+
 class TestCreateCallInvalidPhone:
     def test_invalid_phone_returns_400(self, client, headers):
         """POST /calls with a malformed phone number returns 400."""
@@ -110,6 +117,7 @@ class TestCreateCallInvalidPhone:
 # ===========================================================================
 # 3: POST /calls with Caribbean NPA → 400
 # ===========================================================================
+
 
 class TestCreateCallCaribbeanNPA:
     def test_caribbean_npa_returns_400(self, client, headers):
@@ -129,6 +137,7 @@ class TestCreateCallCaribbeanNPA:
 # 4: POST /calls with no API key → 422
 # ===========================================================================
 
+
 class TestCreateCallNoApiKey:
     def test_missing_api_key_returns_422(self, client):
         """POST /calls without X-API-Key header returns 422 (FastAPI validation)."""
@@ -147,6 +156,7 @@ class TestCreateCallNoApiKey:
 # 5: POST /calls with wrong API key → 401
 # ===========================================================================
 
+
 class TestCreateCallWrongApiKey:
     def test_wrong_api_key_returns_401(self, client):
         """POST /calls with an incorrect API key returns 401."""
@@ -164,6 +174,7 @@ class TestCreateCallWrongApiKey:
 # ===========================================================================
 # 6: GET /calls/{id} known → 200 with room state
 # ===========================================================================
+
 
 class TestGetCallKnown:
     def test_known_call_returns_200(self, client, headers):
@@ -193,9 +204,7 @@ class TestGetCallKnown:
         mock_participant = MagicMock()
         mock_participant.identity = "phone-callee"
         mock_lkapi_instance.room = MagicMock()
-        mock_lkapi_instance.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[mock_room])
-        )
+        mock_lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
         mock_lkapi_instance.room.list_participants = AsyncMock(
             return_value=MagicMock(participants=[mock_participant])
         )
@@ -212,6 +221,7 @@ class TestGetCallKnown:
 # 7: GET /calls/{unknown} → 404
 # ===========================================================================
 
+
 class TestGetCallUnknown:
     def test_unknown_call_returns_404(self, client, headers):
         """GET /calls/{id} for an unknown task returns 404."""
@@ -222,6 +232,81 @@ class TestGetCallUnknown:
 # ===========================================================================
 # 8: POST /calls/{id}/inject missing message → 400
 # ===========================================================================
+
+
+class TestCreateCallEmptyInstructions:
+    def test_empty_instructions_returns_200(self, client, headers):
+        """POST /calls with empty instructions still succeeds (uses default)."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "",
+                },
+                headers=headers,
+            )
+        # Empty string is valid — the model has a default, but explicit empty is OK
+        assert resp.status_code == 200
+
+
+class TestCreateCallLongPhone:
+    def test_very_long_phone_returns_400(self, client, headers):
+        """POST /calls with a very long phone number returns 400."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+1" + "5" * 20,
+                "instructions": "Test",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 400
+
+
+class TestRateLimiting:
+    def test_rate_limit_triggers(self, headers):
+        """Rate limiter returns 429 after exceeding max calls."""
+        # Create app with low rate limit
+        app = create_app(api_key=API_KEY)
+
+        # Override rate limiter to a very low limit
+
+        for route in app.routes:
+            pass  # just need the app
+
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with (
+            patch.object(
+                sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+            ),
+            patch.dict(os.environ, {"RATE_LIMIT_MAX": "2", "RATE_LIMIT_WINDOW": "3600"}),
+        ):
+            # Create app with low rate limit
+            app2 = create_app(api_key=API_KEY)
+            client2 = TestClient(app2)
+
+            for i in range(3):
+                resp = client2.post(
+                    "/calls",
+                    json={
+                        "phone_number": "+12025551234",
+                        "instructions": "Test",
+                    },
+                    headers=headers,
+                )
+                if i < 2:
+                    assert resp.status_code == 200, f"Call {i} should succeed"
+                else:
+                    assert resp.status_code == 429, "Third call should be rate limited"
+
 
 class TestInjectMissingMessage:
     def test_inject_missing_message_returns_400(self, client, headers):
