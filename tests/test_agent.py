@@ -39,6 +39,8 @@ for mod in [
     "livekit.plugins.deepgram",
     "livekit.plugins.silero",
     "livekit.plugins.noise_cancellation",
+    "livekit.plugins.turn_detector",
+    "livekit.plugins.turn_detector.multilingual",
     "livekit.protocol",
     "livekit.protocol.sip",
     "dotenv",
