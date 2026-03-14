@@ -53,6 +53,7 @@ async def _do_dial(
             "caller_id": caller_id,
             "voice_id": voice_id,
             "timeout_seconds": timeout,
+            "approval_required": False,
         })
         await lk.agent_dispatch.create_dispatch(
             CreateAgentDispatchRequest(
@@ -77,7 +78,6 @@ async def _do_status(task_id: str) -> dict:
         return {
             "task_id": task_id,
             "state": metadata.get("state", "unknown"),
-            "duration_seconds": metadata.get("duration_seconds", 0.0),
         }
 
 
@@ -132,6 +132,8 @@ async def dial(
             parsed_info = json.loads(user_info)
         except json.JSONDecodeError:
             return json.dumps({"error": "user_info must be valid JSON"})
+        if not isinstance(parsed_info, dict):
+            return json.dumps({"error": "user_info must be a JSON object (dict), not array or scalar"})
 
     try:
         result = await _do_dial(

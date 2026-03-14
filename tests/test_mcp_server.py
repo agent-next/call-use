@@ -48,19 +48,35 @@ async def test_do_dial_with_user_info(MockLiveKitAPI, MockDispatchReq):
 
 
 @pytest.mark.asyncio
+async def test_dial_rejects_non_dict_user_info():
+    """dial returns error when user_info is a JSON array or scalar."""
+    from call_use.mcp_server import dial
+
+    result_str = await dial(phone="+18005551234", instructions="Test", user_info="[]")
+    result = json.loads(result_str)
+    assert "error" in result
+    assert "dict" in result["error"]
+
+    result_str = await dial(phone="+18005551234", instructions="Test", user_info='"a string"')
+    result = json.loads(result_str)
+    assert "error" in result
+    assert "dict" in result["error"]
+
+
+@pytest.mark.asyncio
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_do_status_returns_call_state(MockLiveKitAPI):
     """status returns current call state from room metadata."""
     mock_api = AsyncMock()
     mock_room = MagicMock()
-    mock_room.metadata = json.dumps({"state": "connected", "duration_seconds": 12.5})
+    mock_room.metadata = json.dumps({"state": "connected"})
     mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
     result = await _do_status(task_id="call-test-123")
     assert result["state"] == "connected"
-    assert result["duration_seconds"] == 12.5
+    assert "duration_seconds" not in result
 
 
 @pytest.mark.asyncio
