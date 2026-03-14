@@ -182,7 +182,7 @@ All endpoints require `X-API-Key` header.
 ## Development
 
 ```bash
-git clone https://github.com/anthropics/call-use.git
+git clone https://github.com/agent-next/call-use.git
 cd call-use
 pip install -e ".[dev]"
 pytest
