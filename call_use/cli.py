@@ -163,28 +163,14 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
     "--phone", "phone_number", default=None, help="Verify phone number via SMS (paid tier)."
 )
 def auth(github, phone_number):
-    """Authenticate with call-use cloud for zero-config calling.
+    """Authenticate with call-use cloud (coming in v0.2).
 
     \b
-    Tiers:
-        --github    Free tier: 5 calls/day to 800 numbers
-        --phone     Paid tier: bind your own caller ID via SMS
+    Not yet available. For v0.1, configure environment variables directly.
+    See: https://github.com/agent-next/call-use#configure
     """
-    if github:
-        click.echo(
-            "call-use cloud auth coming soon. For now, set LIVEKIT_URL, LIVEKIT_API_KEY,"
-            " LIVEKIT_API_SECRET in .env",
-            err=True,
-        )
-        sys.exit(0)
-    if phone_number:
-        click.echo(
-            "Phone verification coming soon. For now, set your caller ID via --caller-id flag.",
-            err=True,
-        )
-        sys.exit(0)
-    click.echo(
-        "Run 'call-use auth --github' for free tier"
-        " or 'call-use auth --phone +1...' for paid tier.",
-        err=True,
-    )
+    click.echo("call-use cloud authentication is coming in v0.2.", err=True)
+    click.echo("For now, set environment variables directly:", err=True)
+    click.echo("  LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET,", err=True)
+    click.echo("  SIP_TRUNK_ID, DEEPGRAM_API_KEY, OPENAI_API_KEY", err=True)
+    click.echo("See: https://github.com/agent-next/call-use#configure", err=True)
