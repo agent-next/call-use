@@ -96,19 +96,30 @@ pip install call-use
 call-use auth --github          # Free tier: 5 calls/day to toll-free numbers
 ```
 
-```python
-from call_use import CallAgent
+**CLI** (simplest — any agent that can run bash can use this):
 
-outcome = await CallAgent(
-    phone="+18001234567",
-    instructions="Cancel my internet subscription. Account #12345.",
-).call()
-
-print(outcome.disposition)   # "completed"
-print(outcome.transcript)    # Full conversation transcript
+```bash
+call-use dial "+18001234567" -i "Cancel my subscription" -u '{"account": "12345"}'
 ```
 
-Or from the CLI (any agent that can run bash can use this):
+**Python SDK:**
+
+```python
+import asyncio
+from call_use import CallAgent
+
+async def main():
+    outcome = await CallAgent(
+        phone="+18001234567",
+        instructions="Cancel my internet subscription. Account #12345.",
+    ).call()
+    print(outcome.disposition)   # "completed"
+    print(outcome.transcript)    # Full conversation transcript
+
+asyncio.run(main())
+```
+
+Or from the CLI with more options:
 
 ```bash
 call-use dial "+18001234567" -i "Cancel my subscription" -u '{"account": "12345"}'
@@ -595,7 +606,11 @@ Note: Current models are already top-tier:
 
 If newer/better models are available at launch time, update here.
 
-- [ ] **Step 2: Verify no cost-optimization shortcuts exist**
+- [ ] **Step 2: Verify TTS model name**
+
+Before committing, verify the TTS model name by checking `livekit-plugins-openai` source or running a test call. If `gpt-4o-mini-tts` is not valid, check for `tts-1-hd` or the latest OpenAI TTS model available through the LiveKit plugin. The `livekit-plugins-openai` library may use different model identifiers than the raw OpenAI API.
+
+- [ ] **Step 3: Verify no cost-optimization shortcuts exist**
 
 Review agent.py for any quality-compromising patterns:
 - No model downgrades for "cheaper" operation
@@ -603,7 +618,7 @@ Review agent.py for any quality-compromising patterns:
 - No audio quality degradation
 - Krisp noise cancellation enabled (already is)
 
-- [ ] **Step 3: Commit if any changes made**
+- [ ] **Step 4: Commit if any changes made**
 
 ```bash
 git add call_use/agent.py
