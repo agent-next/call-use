@@ -17,4 +17,4 @@ pytest
 
 ## Architecture
 
-See the [README](README.md#how-it-works) for an overview.
+See the [README](README.md#architecture) for an overview.
