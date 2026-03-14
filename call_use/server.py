@@ -49,6 +49,9 @@ def create_app(api_key: str | None = None) -> FastAPI:
     app = FastAPI(title="Call-Use API")
 
     # In-memory call registry (call_id → room_name)
+    # WARNING: This state is lost on server restart. For production deployments,
+    # use a persistent store (Redis, database) or rely on LiveKit room metadata
+    # for call state recovery.
     call_rooms: dict[str, str] = {}
     _call_locks: dict[str, asyncio.Lock] = {}
 
