@@ -364,7 +364,7 @@ from call_use import CallAgent
 agent = CallAgent(
     phone="+18001234567",
     instructions="Cancel my internet subscription. Account number 12345.",
-    user_info={"name": "Robert Chen", "account": "12345"},
+    user_info={"name": "Alice Smith", "account": "12345"},
     on_event=lambda e: print(e),         # Real-time events
     on_approval=lambda details: "approved",  # Auto-approve (or ask human)
 )

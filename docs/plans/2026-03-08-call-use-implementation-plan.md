@@ -4,9 +4,7 @@ _Revised from rev 1 based on CX review. Addresses: process boundary architecture
 
 ## Overview
 
-Transform `my-voice-agent` (vertical CS refund app) into `call-use` (open-source outbound call-control SDK). 15 steps. Based on approved PRD v2.1.
-
-**Repo rename**: Rename GitHub repo from `my-voice-agent` to `call-use`. Update all references.
+Transform the initial prototype into `call-use` (open-source outbound call-control SDK). 15 steps. Based on approved PRD v2.1.
 
 ## Architecture Decision: Process Boundary
 
@@ -75,10 +73,9 @@ Step 10 (SDK Entry Point + Approval Flow) ← Steps 3, 4, 5c, 6
 **Size:** Small
 
 ### Actions
-1. Rename GitHub repo: `my-voice-agent` → `call-use`
+1. Set up `call-use` as standalone open-source repo
 2. Update git remote URL
 3. Update any internal references to repo name
-4. Update `.claude/` project path references if needed
 
 ### Verification
 ```bash
@@ -724,7 +721,7 @@ Wire STT transcriptions, LLM responses, and DTMF actions into the EvidencePipeli
 **Investigation required:** Before implementing, the subagent MUST check the actual LiveKit agents v1.4 API by running:
 
 ```bash
-cd /Users/robert/workspace/my-voice-agent
+cd call-use
 python -c "
 from livekit.agents import AgentSession
 import inspect
