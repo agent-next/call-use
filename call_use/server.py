@@ -3,6 +3,8 @@
 import asyncio
 import json
 import os
+import random
+import string
 
 from fastapi import FastAPI, HTTPException, Depends, Header
 from livekit import api
@@ -108,7 +110,6 @@ def create_app(api_key: str | None = None) -> FastAPI:
             except ValueError as e:
                 raise HTTPException(400, str(e))
 
-        import random, string
         task_id = "call-" + "".join(random.choices(string.ascii_lowercase, k=8))
         room_name = task_id
 
