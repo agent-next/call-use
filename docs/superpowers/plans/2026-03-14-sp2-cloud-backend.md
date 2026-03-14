@@ -77,7 +77,7 @@ FREE_TIER_ALLOWED_PREFIXES = ["+1800", "+1888", "+1877", "+1866", "+1855", "+184
 ```python
 # cloud/models.py
 """Cloud gateway data models."""
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 
 from pydantic import BaseModel, Field
@@ -98,7 +98,7 @@ class CloudUser(BaseModel):
     stripe_customer_id: str | None = None
     daily_calls_used: int = 0
     daily_reset_at: datetime | None = None
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 class CloudCallRequest(BaseModel):
@@ -126,11 +126,71 @@ git commit -m "feat(cloud): add cloud gateway config and data models"
 
 ---
 
-### Task 2: GitHub OAuth authentication
+### Task 2: Supabase schema and GitHub OAuth authentication
 
 **Files:**
+- Create: `cloud/db.py`
 - Create: `cloud/auth.py`
 - Test: `tests/test_cloud_auth.py`
+
+- [ ] **Step 0: Create Supabase users table and db client**
+
+SQL migration (run via Supabase dashboard or `supabase migration`):
+
+```sql
+-- supabase/migrations/001_create_users.sql
+CREATE TABLE IF NOT EXISTS users (
+    user_id TEXT PRIMARY KEY,
+    github_login TEXT UNIQUE NOT NULL,
+    tier TEXT NOT NULL DEFAULT 'free',
+    api_key TEXT UNIQUE NOT NULL,
+    verified_phone TEXT,
+    stripe_customer_id TEXT,
+    daily_calls_used INTEGER NOT NULL DEFAULT 0,
+    daily_reset_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_users_api_key ON users (api_key);
+CREATE INDEX idx_users_github_login ON users (github_login);
+
+-- Atomic rate-limit increment: returns the updated row only if under the limit.
+-- If the daily counter belongs to a previous day, reset it first.
+CREATE OR REPLACE FUNCTION increment_daily_calls(
+    p_user_id TEXT,
+    p_limit INTEGER
+) RETURNS SETOF users AS $$
+BEGIN
+    -- Reset counter if it's a new day
+    UPDATE users
+       SET daily_calls_used = 0,
+           daily_reset_at = now()
+     WHERE user_id = p_user_id
+       AND (daily_reset_at IS NULL OR daily_reset_at::date < now()::date);
+
+    -- Atomically increment only if under limit
+    RETURN QUERY
+    UPDATE users
+       SET daily_calls_used = daily_calls_used + 1
+     WHERE user_id = p_user_id
+       AND daily_calls_used < p_limit
+    RETURNING *;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+```python
+# cloud/db.py
+"""Supabase client setup."""
+from supabase import create_client, Client
+
+from cloud.config import SUPABASE_URL, SUPABASE_KEY
+
+
+def get_supabase() -> Client:
+    """Return a configured Supabase client."""
+    return create_client(SUPABASE_URL, SUPABASE_KEY)
+```
 
 - [ ] **Step 1: Write failing test**
 
@@ -211,18 +271,34 @@ async def github_oauth_callback(code: str) -> CloudUser:
 
 async def _get_or_create_user(github_login: str, github_id: int) -> CloudUser:
     """Look up or create a user in the database."""
-    # TODO: Replace with Supabase lookup
-    user = CloudUser(
-        user_id=str(github_id),
-        github_login=github_login,
-        api_key=create_api_key(),
-    )
-    return user
+    from cloud.db import get_supabase
+
+    sb = get_supabase()
+    # Check if user exists
+    result = sb.table("users").select("*").eq("user_id", str(github_id)).execute()
+    if result.data:
+        return CloudUser(**result.data[0])
+
+    # Create new user
+    new_user = {
+        "user_id": str(github_id),
+        "github_login": github_login,
+        "api_key": create_api_key(),
+        "tier": "free",
+        "daily_calls_used": 0,
+    }
+    sb.table("users").insert(new_user).execute()
+    return CloudUser(**new_user)
 
 
 async def _get_user_by_key(api_key: str) -> Optional[CloudUser]:
     """Look up user by API key."""
-    # TODO: Replace with Supabase lookup
+    from cloud.db import get_supabase
+
+    sb = get_supabase()
+    result = sb.table("users").select("*").eq("api_key", api_key).execute()
+    if result.data:
+        return CloudUser(**result.data[0])
     return None
 
 
@@ -257,9 +333,8 @@ git commit -m "feat(cloud): add GitHub OAuth and API key management"
 ```python
 # cloud/rate_limit.py
 """Per-user rate limiting for cloud gateway."""
-from datetime import datetime, timezone
-
 from cloud.config import FREE_TIER_DAILY_LIMIT, FREE_TIER_ALLOWED_PREFIXES
+from cloud.db import get_supabase
 from cloud.models import CloudUser, UserTier
 
 
@@ -269,25 +344,41 @@ class CloudRateLimitError(Exception):
         super().__init__(message)
 
 
-def check_rate_limit(user: CloudUser) -> None:
-    """Check if user can make another call. Raises CloudRateLimitError if not."""
-    now = datetime.now(timezone.utc)
+def check_and_increment_rate_limit(user: CloudUser) -> None:
+    """Atomically check and increment the daily call counter in the database.
 
-    # Reset daily counter if new day
-    if user.daily_reset_at is None or now.date() > user.daily_reset_at.date():
-        user.daily_calls_used = 0
-        user.daily_reset_at = now
+    Uses the Supabase RPC function `increment_daily_calls` which:
+    - Resets the counter if it's a new day
+    - Increments only if under the limit
+    - Returns 0 rows if the limit is exceeded (atomic — no TOCTOU race)
 
-    if user.tier == UserTier.free:
-        if user.daily_calls_used >= FREE_TIER_DAILY_LIMIT:
-            raise CloudRateLimitError(
-                f"Free tier limit reached ({FREE_TIER_DAILY_LIMIT}/day). "
-                "Upgrade with 'call-use auth --phone' or bring your own keys."
-            )
+    Raises CloudRateLimitError if the user has hit their daily limit.
+    """
+    if user.tier == UserTier.enterprise:
+        return  # Enterprise has custom/unlimited limits
+
+    limit = FREE_TIER_DAILY_LIMIT  # Extend per-tier limits as needed
+
+    sb = get_supabase()
+    result = sb.rpc("increment_daily_calls", {
+        "p_user_id": user.user_id,
+        "p_limit": limit,
+    }).execute()
+
+    if not result.data:
+        raise CloudRateLimitError(
+            f"Free tier limit reached ({FREE_TIER_DAILY_LIMIT}/day). "
+            "Upgrade with 'call-use auth --phone' or bring your own keys."
+        )
 
 
 def check_phone_allowed(user: CloudUser, phone: str) -> None:
-    """Check if user's tier allows calling this number."""
+    """Check if user's tier allows calling this number.
+
+    IMPORTANT: Always call validate_phone_number() BEFORE this function
+    to ensure the phone string is valid E.164 format. This function only
+    checks tier-based prefix restrictions, not format validity.
+    """
     if user.tier == UserTier.free:
         allowed = any(phone.startswith(prefix) for prefix in FREE_TIER_ALLOWED_PREFIXES)
         if not allowed:
@@ -443,16 +534,35 @@ Expected: FAIL
 
 ```python
 # cloud/app.py
-"""call-use cloud gateway — hosted API for zero-config calling."""
+"""call-use cloud gateway — hosted API for zero-config calling.
+
+Architecture: The gateway NEVER blocks on call completion. It creates a
+LiveKit room, dispatches an agent into it, and returns immediately with
+a task_id. Clients poll GET /v1/calls/{task_id} for outcome or subscribe
+to GET /v1/calls/{task_id}/events (SSE) for real-time updates.
+
+This mirrors the self-hosted server.py pattern which uses fire-and-forget
+via agent_dispatch.create_dispatch().
+"""
 import json
+import logging
 import os
+import uuid
 from typing import Optional
 
+import sentry_sdk
 from fastapi import FastAPI, HTTPException, Header
 
+from call_use.phone import validate_phone_number
 from cloud.auth import validate_api_key, github_oauth_callback
-from cloud.models import CloudCallRequest, CloudCallResponse, CloudUser
-from cloud.rate_limit import check_rate_limit, check_phone_allowed, CloudRateLimitError
+from cloud.config import SANDBOX_CALLER_ID, LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, SIP_TRUNK_ID
+from cloud.models import CloudCallRequest, CloudCallResponse, CloudUser, UserTier
+from cloud.rate_limit import check_and_increment_rate_limit, check_phone_allowed, CloudRateLimitError
+
+logger = logging.getLogger("cloud.app")
+
+# Initialize Sentry for error alerting (reads SENTRY_DSN from env)
+sentry_sdk.init(traces_sample_rate=0.1)
 
 
 def create_cloud_app() -> FastAPI:
@@ -473,9 +583,21 @@ def create_cloud_app() -> FastAPI:
         return {"url": f"https://github.com/login/oauth/authorize?client_id={client_id}&scope=read:user"}
 
     @app.get("/auth/github/callback")
-    async def github_auth_callback(code: str):
-        """Handle GitHub OAuth callback, return API key."""
+    async def github_auth_callback(code: str, port: int | None = None):
+        """Handle GitHub OAuth callback, return API key.
+
+        If `port` query param is present, redirects to the CLI's local
+        callback server instead of displaying JSON in the browser.
+        """
         user = await github_oauth_callback(code)
+
+        # If CLI provided a local callback port, redirect the API key there
+        if port:
+            from fastapi.responses import RedirectResponse
+            return RedirectResponse(
+                url=f"http://localhost:{port}/callback?api_key={user.api_key}&tier={user.tier.value}"
+            )
+
         return {
             "api_key": user.api_key,
             "tier": user.tier.value,
@@ -487,7 +609,11 @@ def create_cloud_app() -> FastAPI:
         req: CloudCallRequest,
         authorization: Optional[str] = Header(None),
     ):
-        """Create an outbound call via call-use cloud."""
+        """Create an outbound call via call-use cloud.
+
+        Returns immediately with a task_id. Does NOT block for call duration.
+        Use GET /v1/calls/{task_id} to poll for outcome.
+        """
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing API key. Run 'call-use auth --github' first.")
 
@@ -496,45 +622,134 @@ def create_cloud_app() -> FastAPI:
         if not user:
             raise HTTPException(status_code=401, detail="Invalid API key")
 
-        # Enforce tier restrictions
+        # Step 1: Validate phone number format (E.164, 11 digits)
+        # This MUST happen before check_phone_allowed() to prevent
+        # malformed strings from bypassing prefix checks.
         try:
-            check_rate_limit(user)
+            validate_phone_number(req.phone)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+        # Step 2: Enforce caller_id based on tier (prevent spoofing)
+        caller_id = _resolve_caller_id(user, req.caller_id)
+
+        # Step 3: Enforce tier restrictions (phone prefixes)
+        try:
             check_phone_allowed(user, req.phone)
         except CloudRateLimitError as e:
             raise HTTPException(status_code=403, detail=e.message)
 
-        # Use verified phone as caller_id for Tier 2+
-        caller_id = req.caller_id
-        if user.verified_phone and not caller_id:
-            caller_id = user.verified_phone
+        # Step 4: Atomic rate limit check + increment in database
+        # This is a single DB operation — no in-memory mutation.
+        try:
+            check_and_increment_rate_limit(user)
+        except CloudRateLimitError as e:
+            raise HTTPException(status_code=429, detail=e.message)
 
+        # Step 5: Dispatch call (fire-and-forget, returns immediately)
         result = await _dispatch_call(user, req, caller_id)
-        user.daily_calls_used += 1
+        logger.info(
+            "call_dispatched",
+            extra={"call_id": result["task_id"], "user_id": user.user_id, "phone": req.phone},
+        )
         return CloudCallResponse(**result)
+
+    @app.get("/v1/calls/{task_id}")
+    async def get_call_status(task_id: str, authorization: Optional[str] = Header(None)):
+        """Poll for call outcome. Reads status from LiveKit room metadata."""
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Missing API key")
+
+        from livekit.api import LiveKitAPI
+
+        lk = LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+        try:
+            room = await lk.room.list_rooms(names=[task_id])
+            if not room or not room.rooms:
+                raise HTTPException(status_code=404, detail="Call not found")
+
+            room_data = room.rooms[0]
+            metadata = json.loads(room_data.metadata) if room_data.metadata else {}
+            return {
+                "task_id": task_id,
+                "status": metadata.get("status", "in_progress"),
+                "outcome": metadata.get("outcome"),
+            }
+        finally:
+            await lk.aclose()
+
+    # Optional: SSE endpoint for real-time streaming (future enhancement)
+    # @app.get("/v1/calls/{task_id}/events")
+    # async def call_events_sse(task_id: str): ...
 
     return app
 
 
-async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str | None) -> dict:
-    """Dispatch a call via LiveKit agent."""
-    from call_use.sdk import CallAgent
+def _resolve_caller_id(user: CloudUser, requested_caller_id: str | None) -> str | None:
+    """Resolve caller_id based on user tier. Prevents caller ID spoofing.
 
-    agent = CallAgent(
-        phone=req.phone,
-        instructions=req.instructions,
-        user_info=req.user_info,
-        caller_id=caller_id,
-        voice_id=req.voice_id,
-        approval_required=False,
-        timeout_seconds=req.timeout,
+    - free tier: ALWAYS use SANDBOX_CALLER_ID, ignore any request
+    - verified tier: ONLY allow user's own verified_phone
+    - enterprise tier: allow any validated caller_id
+    """
+    if user.tier == UserTier.free:
+        return SANDBOX_CALLER_ID
+    elif user.tier == UserTier.verified:
+        # Verified users can only use their own verified phone
+        return user.verified_phone
+    else:  # enterprise
+        return requested_caller_id
+
+
+async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str | None) -> dict:
+    """Dispatch a call via LiveKit agent — fire-and-forget.
+
+    Creates a LiveKit room and dispatches the call-use agent into it,
+    then returns immediately. This mirrors the self-hosted server.py
+    pattern (agent_dispatch.create_dispatch()) and does NOT block for
+    the call duration (which can be up to 600 seconds).
+
+    The agent writes its outcome to the room metadata, which can be
+    polled via GET /v1/calls/{task_id}.
+    """
+    from livekit.api import LiveKitAPI
+    from call_use.agent_dispatch import create_dispatch
+
+    task_id = f"cu-{uuid.uuid4().hex[:12]}"
+
+    lk = LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
+    try:
+        # Fire-and-forget: create room + dispatch agent, return immediately
+        await create_dispatch(
+            lk=lk,
+            room_name=task_id,
+            phone=req.phone,
+            instructions=req.instructions,
+            user_info=req.user_info,
+            caller_id=caller_id,
+            voice_id=req.voice_id,
+            sip_trunk_id=SIP_TRUNK_ID,
+        )
+    finally:
+        await lk.aclose()
+
+    logger.info(
+        "agent_dispatched",
+        extra={"call_id": task_id, "user_id": user.user_id},
     )
-    outcome = await agent.call()
+
     return {
-        "task_id": outcome.task_id,
+        "task_id": task_id,
         "status": "dispatched",
-        "monitor_token": None,
+        "monitor_token": task_id,  # Can be used to poll /v1/calls/{task_id}
     }
 ```
+
+> **Note on cost tracking:** Each call incurs costs across multiple providers:
+> Twilio (SIP trunk minutes), LiveKit (media server), OpenAI (LLM tokens),
+> and Deepgram (STT minutes). Structured logging with `call_id` and `user_id`
+> on every log line enables per-call cost attribution. Integrate with a billing
+> pipeline that reads these structured logs to compute per-user costs.
 
 - [ ] **Step 4: Run tests**
 
@@ -621,11 +836,89 @@ async def cloud_dial(
         return resp.json()
 
 
-def start_github_auth():
-    """Open browser for GitHub OAuth, return instructions."""
-    url = f"{CLOUD_API_URL}/auth/github"
-    webbrowser.open(url)
-    return "Opening browser for GitHub authentication..."
+def start_github_auth() -> str:
+    """Run GitHub OAuth flow with a local callback server.
+
+    1. Start a temporary HTTP server on a random port
+    2. Open browser to GitHub OAuth with redirect_uri pointing to localhost
+    3. After auth, the cloud server redirects back to localhost with the API key
+    4. CLI captures the key, saves to config, and stops the server
+    5. Fallback: if browser can't open, show URL for manual flow
+    """
+    import json
+    import socket
+    import threading
+    from http.server import HTTPServer, BaseHTTPRequestHandler
+    from pathlib import Path
+    from urllib.parse import urlparse, parse_qs
+
+    # Find a free port
+    with socket.socket() as s:
+        s.bind(("", 0))
+        port = s.getsockname()[1]
+
+    captured_key: dict = {}
+    server_ready = threading.Event()
+
+    class CallbackHandler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            parsed = urlparse(self.path)
+            params = parse_qs(parsed.query)
+            if "api_key" in params:
+                captured_key["api_key"] = params["api_key"][0]
+                captured_key["tier"] = params.get("tier", ["free"])[0]
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.end_headers()
+                self.wfile.write(b"<h1>Authenticated!</h1><p>You can close this tab.</p>")
+            else:
+                self.send_response(400)
+                self.end_headers()
+
+        def log_message(self, format, *args):
+            pass  # Suppress server logs
+
+    server = HTTPServer(("127.0.0.1", port), CallbackHandler)
+    server.timeout = 120  # 2 minute timeout
+
+    # The cloud server's /auth/github/callback will redirect to localhost:{port}
+    auth_url = f"{CLOUD_API_URL}/auth/github?redirect_port={port}"
+
+    try:
+        webbrowser.open(auth_url)
+    except Exception:
+        print(f"Could not open browser. Visit this URL manually:\n  {auth_url}")
+        print("Then paste your API key below:")
+        manual_key = input("API key: ").strip()
+        if manual_key:
+            _save_api_key(manual_key)
+            return f"API key saved. Run: export CALLUSE_API_KEY='{manual_key}'"
+        return "Authentication cancelled."
+
+    # Wait for callback
+    server.handle_request()
+    server.server_close()
+
+    if "api_key" in captured_key:
+        _save_api_key(captured_key["api_key"])
+        return f"Authenticated as {captured_key['tier']} tier. API key saved to ~/.config/call-use/config.json"
+    return "Authentication timed out. Try again with 'call-use auth --github'."
+
+
+def _save_api_key(api_key: str) -> None:
+    """Save API key to config file."""
+    import json
+    from pathlib import Path
+
+    config_dir = Path.home() / ".config" / "call-use"
+    config_dir.mkdir(parents=True, exist_ok=True)
+    config_file = config_dir / "config.json"
+
+    config = {}
+    if config_file.exists():
+        config = json.loads(config_file.read_text())
+    config["api_key"] = api_key
+    config_file.write_text(json.dumps(config, indent=2))
 ```
 
 - [ ] **Step 2: Update CLI dial to auto-detect cloud mode**
@@ -686,8 +979,6 @@ def auth(github, phone_number):
     if github:
         msg = start_github_auth()
         click.echo(msg, err=True)
-        click.echo("After authorizing, copy your API key and run:", err=True)
-        click.echo("  export CALLUSE_API_KEY='cu_...'", err=True)
         return
 
     if phone_number:
@@ -714,22 +1005,7 @@ git commit -m "feat(cloud): add cloud client with auto-detection in CLI"
 - Create: `cloud/fly.toml`
 - Create: `cloud/requirements.txt`
 
-- [ ] **Step 1: Write Dockerfile**
-
-```dockerfile
-# cloud/Dockerfile
-FROM python:3.12-slim
-
-WORKDIR /app
-COPY cloud/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY call_use/ /app/call_use/
-COPY cloud/ /app/cloud/
-
-EXPOSE 8080
-CMD ["uvicorn", "cloud.app:create_cloud_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]
-```
+- [ ] **Step 1: Write Dockerfile** (see updated Dockerfile in Step 3 below)
 
 - [ ] **Step 2: Write fly.toml**
 
@@ -759,7 +1035,32 @@ httpx
 twilio
 stripe
 supabase
-call-use @ git+https://github.com/agent-next/call-use.git
+sentry-sdk[fastapi]
+# call-use is installed via COPY + pip install in the Dockerfile (local source).
+# For production after PyPI publication, use: call-use>=1.0.0
+```
+
+Update the Dockerfile to install call-use from local source instead of git:
+
+```dockerfile
+# cloud/Dockerfile
+FROM python:3.12-slim
+
+WORKDIR /app
+
+# Install cloud dependencies first (layer caching)
+COPY cloud/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Install call-use from local source (pinned to this build, not git HEAD)
+COPY pyproject.toml setup.cfg ./
+COPY call_use/ /app/call_use/
+RUN pip install --no-cache-dir .
+
+COPY cloud/ /app/cloud/
+
+EXPOSE 8080
+CMD ["uvicorn", "cloud.app:create_cloud_app", "--factory", "--host", "0.0.0.0", "--port", "8080"]
 ```
 
 - [ ] **Step 4: Commit**
@@ -776,11 +1077,28 @@ git commit -m "feat(cloud): add deployment config for Fly.io"
 | Task | Description | Tier |
 |------|-------------|------|
 | 1 | Cloud config + models | All |
-| 2 | GitHub OAuth auth | Tier 1 |
-| 3 | Rate limiting + phone restrictions | Tier 1 |
+| 2 | Supabase schema + GitHub OAuth auth + db client | Tier 1 |
+| 3 | Rate limiting (atomic DB ops) + phone restrictions | Tier 1 |
 | 4 | Twilio Verify phone binding | Tier 2 |
-| 5 | Cloud FastAPI gateway | All |
-| 6 | SDK cloud auto-detection | All |
-| 7 | Deployment config | Ops |
+| 5 | Cloud FastAPI gateway (async dispatch, caller ID enforcement, phone validation) | All |
+| 6 | SDK cloud auto-detection + local OAuth callback server | All |
+| 7 | Deployment config (local COPY install, Sentry) | Ops |
 
-**Total: 7 tasks, ~10 commits, ~500 lines of new code**
+**Total: 7 tasks, ~10 commits, ~600 lines of new code**
+
+---
+
+## Review Findings Applied
+
+This plan incorporates fixes for the following review findings:
+
+1. **CRITICAL: Async dispatch** — `_dispatch_call()` uses fire-and-forget via `create_dispatch()` (mirrors `server.py`). Added `GET /v1/calls/{task_id}` polling endpoint.
+2. **CRITICAL: Atomic rate limits** — `check_and_increment_rate_limit()` uses a Supabase RPC function. No in-memory mutation.
+3. **CRITICAL: Phone validation** — `validate_phone_number()` called before `check_phone_allowed()` in `create_call`.
+4. **HIGH: OAuth key delivery** — CLI starts a local HTTP server; cloud redirects API key to `localhost:{port}/callback`.
+5. **HIGH: Caller ID spoofing** — `_resolve_caller_id()` enforces per-tier rules (free=sandbox, verified=own phone, enterprise=any).
+6. **HIGH: Prefix bypass** — Validation chain is: `validate_phone_number()` (format) → `check_phone_allowed()` (tier prefix).
+7. **MEDIUM: `datetime.utcnow()` deprecated** — Replaced with `datetime.now(timezone.utc)`.
+8. **MEDIUM: Supabase stubs** — Task 2 now includes SQL schema, `cloud/db.py`, and real Supabase queries in auth.py.
+9. **MEDIUM: No observability** — Added `sentry-sdk`, structured logging with `call_id`/`user_id`, cost tracking note.
+10. **MEDIUM: Unpinned git dep** — Dockerfile uses `COPY + pip install .` from local source. Requirements note for PyPI after publication.
