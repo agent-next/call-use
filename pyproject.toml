@@ -19,6 +19,7 @@ dependencies = [
     "uvicorn",
     "pydantic>=2.0",
     "httpx",
+    "click>=8.0",
 ]
 
 [project.optional-dependencies]
@@ -26,6 +27,7 @@ dev = ["pytest", "pytest-asyncio", "httpx"]
 
 [project.scripts]
 call-use-worker = "call_use.agent:main"
+call-use = "call_use.cli:main"
 
 [tool.setuptools.dynamic]
 version = {attr = "call_use._version.__version__"}
