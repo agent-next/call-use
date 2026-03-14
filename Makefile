@@ -11,8 +11,8 @@ format:
 	ruff format call_use/ tests/
 
 build: clean
-	python -m build
-	twine check dist/*
+	python3 -m build
+	python3 -m twine check dist/*
 
 check: lint test build
 
