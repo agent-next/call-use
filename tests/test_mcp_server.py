@@ -53,13 +53,14 @@ async def test_do_status_returns_call_state(MockLiveKitAPI):
     """status returns current call state from room metadata."""
     mock_api = AsyncMock()
     mock_room = MagicMock()
-    mock_room.metadata = json.dumps({"state": "connected"})
+    mock_room.metadata = json.dumps({"state": "connected", "duration_seconds": 12.5})
     mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
     result = await _do_status(task_id="call-test-123")
     assert result["state"] == "connected"
+    assert result["duration_seconds"] == 12.5
 
 
 @pytest.mark.asyncio
@@ -114,3 +115,18 @@ async def test_do_result_in_progress(MockLiveKitAPI):
     result = await _do_result(task_id="call-test-123")
     assert result["status"] == "in_progress"
     assert result["state"] == "connected"
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_cancel_sends_command(MockLiveKitAPI):
+    """cancel tool sends cancel command via data channel."""
+    mock_api = AsyncMock()
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import cancel
+    result_str = await cancel(task_id="call-test-cancel")
+    result = json.loads(result_str)
+    assert result["status"] == "cancel_requested"
+    mock_api.room.send_data.assert_called_once()

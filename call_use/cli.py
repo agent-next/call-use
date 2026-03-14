@@ -108,7 +108,7 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
         )
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
-        sys.exit(2)
+        sys.exit(1)
 
     click.echo(json.dumps(result, indent=2))
 

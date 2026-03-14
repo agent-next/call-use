@@ -50,6 +50,7 @@ async def _do_dial(
             "phone_number": phone,
             "instructions": instructions,
             "user_info": user_info or {},
+            "caller_id": caller_id,
             "voice_id": voice_id,
             "timeout_seconds": timeout,
         })
@@ -76,6 +77,7 @@ async def _do_status(task_id: str) -> dict:
         return {
             "task_id": task_id,
             "state": metadata.get("state", "unknown"),
+            "duration_seconds": metadata.get("duration_seconds", 0.0),
         }
 
 
