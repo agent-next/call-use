@@ -635,7 +635,7 @@ def create_cloud_app() -> FastAPI:
         # This MUST happen before check_phone_allowed() to prevent
         # malformed strings from bypassing prefix checks.
         try:
-            validate_phone_number(req.phone)
+            validated_phone = validate_phone_number(req.phone)
         except ValueError as e:
             raise HTTPException(status_code=400, detail=str(e))
 
@@ -643,8 +643,9 @@ def create_cloud_app() -> FastAPI:
         caller_id = _resolve_caller_id(user, req.caller_id)
 
         # Step 3: Enforce tier restrictions (phone prefixes)
+        # Use validated_phone (E.164) — not req.phone which may have whitespace
         try:
-            check_phone_allowed(user, req.phone)
+            check_phone_allowed(user, validated_phone)
         except CloudRateLimitError as e:
             raise HTTPException(status_code=403, detail=e.message)
 
@@ -656,18 +657,24 @@ def create_cloud_app() -> FastAPI:
             raise HTTPException(status_code=429, detail=e.message)
 
         # Step 5: Dispatch call (fire-and-forget, returns immediately)
-        result = await _dispatch_call(user, req, caller_id)
+        result = await _dispatch_call(user, req, caller_id, validated_phone)
         logger.info(
             "call_dispatched",
-            extra={"call_id": result["task_id"], "user_id": user.user_id, "phone": req.phone},
+            extra={"call_id": result["task_id"], "user_id": user.user_id, "phone": validated_phone},
         )
         return CloudCallResponse(**result)
 
     @app.get("/v1/calls/{task_id}")
     async def get_call_status(task_id: str, authorization: Optional[str] = Header(None)):
-        """Poll for call outcome. Reads status from LiveKit room metadata."""
+        """Poll for call outcome. Reads state from LiveKit room metadata."""
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing API key")
+
+        # Validate the API key and verify ownership
+        api_key = authorization.replace("Bearer ", "")
+        user = await validate_api_key(api_key)
+        if not user:
+            raise HTTPException(status_code=401, detail="Invalid API key")
 
         from livekit import api as lk_proto
         from livekit.api import LiveKitAPI
@@ -681,11 +688,24 @@ def create_cloud_app() -> FastAPI:
 
             room_data = rooms.rooms[0]
             metadata = json.loads(room_data.metadata) if room_data.metadata else {}
-            return {
+
+            # Verify this call belongs to the requesting user
+            # (dispatch metadata contains user context for ownership check)
+            dispatch_meta = json.loads(room_data.metadata) if room_data.metadata else {}
+            if dispatch_meta.get("user_id") and dispatch_meta["user_id"] != user.user_id:
+                raise HTTPException(status_code=404, detail="Call not found")
+
+            # Read "state" — matches finalize_and_publish() which writes
+            # {"state": "ended", "outcome": {...}}
+            state = metadata.get("state", "in_progress")
+            result = {
                 "task_id": task_id,
-                "status": metadata.get("status", "in_progress"),
-                "outcome": metadata.get("outcome"),
+                "state": state,
             }
+            if state == "ended" and "outcome" in metadata:
+                result["outcome"] = metadata["outcome"]
+                result["disposition"] = metadata.get("disposition")
+            return result
 
     # Optional: SSE endpoint for real-time streaming (future enhancement)
     # @app.get("/v1/calls/{task_id}/events")
@@ -710,7 +730,7 @@ def _resolve_caller_id(user: CloudUser, requested_caller_id: str | None) -> str 
         return requested_caller_id
 
 
-async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str | None) -> dict:
+async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str | None, validated_phone: str) -> dict:
     """Dispatch a call via LiveKit agent — fire-and-forget.
 
     Creates a LiveKit room and dispatches the call-use agent into it,
@@ -735,7 +755,8 @@ async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str 
                 agent_name="call-use-agent",
                 room=task_id,
                 metadata=json.dumps({
-                    "phone_number": req.phone,
+                    "user_id": user.user_id,
+                    "phone_number": validated_phone,
                     "caller_id": caller_id,
                     "instructions": req.instructions,
                     "user_info": req.user_info or {},
@@ -1124,3 +1145,9 @@ This plan incorporates fixes for the following review findings:
 12. **CRITICAL: `call_use.agent_dispatch` does not exist** — `_dispatch_call` now uses the LiveKit API directly (`lkapi.agent_dispatch.create_dispatch` with `CreateAgentDispatchRequest`), matching the pattern in `sdk.py` and `server.py`. Removed `sip_trunk_id` from dispatch (configured in SIP trunk setup, not per-call).
 13. **MEDIUM: OAuth callback server single-shot** — `handle_request()` now loops with a 120s deadline until `captured_key` is populated, preventing `/favicon.ico` from consuming the only request.
 14. **LOW: Test mock missing `monitor_token`** — Added `"monitor_token": "test-123"` to `mock_dispatch.return_value` to match `CloudCallResponse` model.
+
+### Round 3 Findings
+
+15. **HIGH: Validated phone number discarded** — `validate_phone_number()` return value was discarded; `req.phone` (possibly with whitespace) was used for prefix checks and dispatch. Now captured as `validated_phone` and used everywhere after validation.
+16. **CRITICAL: `/v1/calls/{task_id}` has no auth** — Polling endpoint only checked `Bearer ` prefix but never validated the API key or checked call ownership. Added `validate_api_key()` call and ownership verification via `user_id` in room metadata.
+17. **CRITICAL: Polling reads `"status"` but agent writes `"state"`** — `finalize_and_publish()` writes `{"state": "ended", "outcome": {...}}` but polling read `metadata.get("status")`. Changed to `metadata.get("state", "in_progress")` and added `outcome`/`disposition` fields when state is `"ended"`.
