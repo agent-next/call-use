@@ -148,7 +148,7 @@ class _LiveKitCallAgent(Agent):
         self._approval_result: str | None = None
         self._approval_id: str | None = None
 
-        # LiveKit handles (set in run() -- Step 5b)
+        # LiveKit handles (set via set_context() before session.start)
         self._room = None
         self._lk_api = None
 
@@ -490,144 +490,13 @@ class _LiveKitCallAgent(Agent):
             except Exception:
                 logger.warning("Failed to remove SIP participant", exc_info=True)
 
-    # ---- Session lifecycle (Step 5b) ----
+    # ---- Setup (called from entrypoint before session.start) ----
 
-    async def run(self, ctx: JobContext):
-        """Full call lifecycle: create session, dial SIP, wire events, wait."""
+    def set_context(self, ctx: JobContext):
+        """Store LiveKit handles so the agent can access room/api."""
         self._ctx = ctx
         self._room = ctx.room
         self._lk_api = ctx.api
-        task = self._task
-
-        # Create session with configurable voice
-        tts_voice = task.voice_id or "alloy"
-        session = AgentSession(
-            stt=deepgram.STT(model="nova-3", language="en-US"),
-            llm=openai.LLM(model="gpt-4o"),
-            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
-            vad=silero.VAD.load(),
-            turn_detection=MultilingualModel(),
-            min_endpointing_delay=0.6,
-        )
-
-        # Wire evidence events to call-events data channel
-        if self._evidence:
-            async def _publish_event(event: CallEvent):
-                try:
-                    await ctx.room.local_participant.publish_data(
-                        event.model_dump_json().encode(),
-                        reliable=True,
-                        topic="call-events",
-                    )
-                except Exception:
-                    logger.warning("Failed to publish event", exc_info=True)
-            self._evidence.subscribe(_publish_event)
-
-        # Emit initial state
-        await self._set_state(CallStateEnum.dialing)
-
-        # Create SIP participant (dials the phone)
-        sip_request = CreateSIPParticipantRequest(
-            sip_trunk_id=SIP_TRUNK_ID,
-            sip_call_to=task.phone_number,
-            sip_number=task.caller_id or "",
-            room_name=ctx.room.name,
-            participant_identity="phone-callee",
-            participant_name="Phone Call",
-            krisp_enabled=True,
-            wait_until_answered=True,
-        )
-        try:
-            await ctx.api.sip.create_sip_participant(sip_request)
-        except Exception as e:
-            error_msg = str(e).lower()
-            if "busy" in error_msg:
-                disp = DispositionEnum.busy
-            elif "no answer" in error_msg or "timeout" in error_msg:
-                disp = DispositionEnum.no_answer
-            elif "voicemail" in error_msg:
-                disp = DispositionEnum.voicemail
-            else:
-                disp = DispositionEnum.failed
-            if self._evidence:
-                await self._evidence.emit_error("dial_failed", str(e))
-            await self.finalize_and_publish(disp)
-            return
-
-        # Wait for phone participant to connect
-        try:
-            participant = await asyncio.wait_for(
-                ctx.wait_for_participant(identity="phone-callee"),
-                timeout=60,
-            )
-        except asyncio.TimeoutError:
-            await self.finalize_and_publish(DispositionEnum.no_answer)
-            return
-        self._call_start_time = time.time()
-
-        # Start session pinned to phone-callee
-        await session.start(
-            room=ctx.room,
-            agent=self,
-            room_options=room_io.RoomOptions(
-                participant_identity="phone-callee",
-                audio_input=room_io.AudioInputOptions(
-                    noise_cancellation=lambda params: (
-                        noise_cancellation.BVCTelephony()
-                        if params.participant.kind
-                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
-                        else noise_cancellation.BVC()
-                    ),
-                ),
-            ),
-        )
-
-        logger.info(f"Agent identity: {ctx.room.local_participant.identity}")
-
-        # Wire agent speech into evidence (Step 5c)
-        if self._evidence:
-            @session.on("agent_speech_committed")
-            def _on_agent_speech(msg):
-                text = msg.text_content if hasattr(msg, "text_content") else str(msg)
-                if text:
-                    asyncio.create_task(self._evidence.emit_transcript("agent", text))
-
-            @session.on("function_tools_executed")
-            def _on_tools_executed(ev):
-                for call in getattr(ev, "function_calls", []):
-                    if getattr(call, "name", "") == "send_dtmf_events":
-                        keys = (call.arguments or {}).get("keys", "")
-                        if keys:
-                            asyncio.create_task(self._evidence.emit_dtmf(keys))
-
-        # Timeout guard
-        timeout_task = asyncio.create_task(self._timeout_guard(task.timeout_seconds))
-
-        # Handle participant disconnect
-        @ctx.room.on("participant_disconnected")
-        def _on_participant_left(p):
-            if p.identity == "phone-callee":
-                timeout_task.cancel()
-                if self._cancelled:
-                    return  # Already finalized by cancel handler
-                duration = time.time() - self._call_start_time
-                if duration < 3:
-                    disp = DispositionEnum.failed  # Immediate disconnect
-                elif self._call_ended_normally:
-                    disp = DispositionEnum.completed
-                else:
-                    disp = DispositionEnum.failed  # Mid-call drop
-                    if self._evidence:
-                        asyncio.create_task(
-                            self._evidence.emit_error(
-                                "mid_call_drop",
-                                f"Call dropped after {duration:.0f}s",
-                            )
-                        )
-                asyncio.create_task(self.finalize_and_publish(disp))
-
-        # Outbound calls: agent waits for callee to speak first, then responds automatically
-        # via the STT→LLM→TTS pipeline. No greeting is generated.
 
     async def _timeout_guard(self, timeout_seconds: int):
         """Cancel the call after timeout_seconds."""
@@ -649,9 +518,12 @@ server = AgentServer()
 @server.rtc_session(agent_name="call-use-agent")
 async def entrypoint(ctx: JobContext):
     """Module-level entrypoint registered with LiveKit.
-    Parses metadata, creates agent, delegates to agent.run()."""
-    await ctx.connect()
 
+    Follows the official LiveKit v1.4 telephony pattern:
+      1. Create AgentSession and start it (connects agent to the room)
+      2. Place outbound SIP call (dial the phone)
+      3. Wire evidence events, timeout guard, and disconnect handler
+    """
     meta = json.loads(ctx.job.metadata or "{}")
     task = CallTask(
         task_id=ctx.room.name,
@@ -674,7 +546,131 @@ async def entrypoint(ctx: JobContext):
         task, room_name=ctx.room.name, agent_identity=agent_identity,
     )
     agent = _LiveKitCallAgent(task=task, evidence=evidence)
-    await agent.run(ctx)
+    agent.set_context(ctx)
+
+    # Wire evidence events to call-events data channel
+    if evidence:
+        async def _publish_event(event: CallEvent):
+            try:
+                await ctx.room.local_participant.publish_data(
+                    event.model_dump_json().encode(),
+                    reliable=True,
+                    topic="call-events",
+                )
+            except Exception:
+                logger.warning("Failed to publish event", exc_info=True)
+        evidence.subscribe(_publish_event)
+
+    # -- Step 1: Create and start the AgentSession BEFORE dialing --
+    tts_voice = task.voice_id or "alloy"
+    session = AgentSession(
+        stt=deepgram.STT(model="nova-3", language="en-US"),
+        llm=openai.LLM(model="gpt-4o"),
+        tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
+        vad=silero.VAD.load(),
+        turn_detection=MultilingualModel(),
+        min_endpointing_delay=0.6,
+    )
+
+    await session.start(
+        room=ctx.room,
+        agent=agent,
+        room_options=room_io.RoomOptions(
+            participant_identity="phone-callee",
+            audio_input=room_io.AudioInputOptions(
+                noise_cancellation=lambda params: (
+                    noise_cancellation.BVCTelephony()
+                    if params.participant.kind
+                    == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                    else noise_cancellation.BVC()
+                ),
+            ),
+        ),
+    )
+
+    logger.info(f"Agent identity: {ctx.room.local_participant.identity}")
+
+    # Wire agent speech into evidence
+    if evidence:
+        @session.on("agent_speech_committed")
+        def _on_agent_speech(msg):
+            text = msg.text_content if hasattr(msg, "text_content") else str(msg)
+            if text:
+                asyncio.create_task(evidence.emit_transcript("agent", text))
+
+        @session.on("function_tools_executed")
+        def _on_tools_executed(ev):
+            for call in getattr(ev, "function_calls", []):
+                if getattr(call, "name", "") == "send_dtmf_events":
+                    keys = (call.arguments or {}).get("keys", "")
+                    if keys:
+                        asyncio.create_task(evidence.emit_dtmf(keys))
+
+    # -- Step 2: Place the outbound SIP call AFTER session is ready --
+    await agent._set_state(CallStateEnum.dialing)
+
+    sip_request = CreateSIPParticipantRequest(
+        sip_trunk_id=SIP_TRUNK_ID,
+        sip_call_to=task.phone_number,
+        sip_number=task.caller_id or "",
+        room_name=ctx.room.name,
+        participant_identity="phone-callee",
+        participant_name="Phone Call",
+        krisp_enabled=True,
+        wait_until_answered=True,
+    )
+    try:
+        await ctx.api.sip.create_sip_participant(sip_request)
+    except Exception as e:
+        error_msg = str(e).lower()
+        if "busy" in error_msg:
+            disp = DispositionEnum.busy
+        elif "no answer" in error_msg or "timeout" in error_msg:
+            disp = DispositionEnum.no_answer
+        elif "voicemail" in error_msg:
+            disp = DispositionEnum.voicemail
+        else:
+            disp = DispositionEnum.failed
+        if evidence:
+            await evidence.emit_error("dial_failed", str(e))
+        await agent.finalize_and_publish(disp)
+        return
+
+    # Wait for phone participant to connect
+    try:
+        await asyncio.wait_for(
+            ctx.wait_for_participant(identity="phone-callee"),
+            timeout=60,
+        )
+    except asyncio.TimeoutError:
+        await agent.finalize_and_publish(DispositionEnum.no_answer)
+        return
+    agent._call_start_time = time.time()
+
+    # -- Step 3: Wire timeout guard and disconnect handler --
+    timeout_task = asyncio.create_task(agent._timeout_guard(task.timeout_seconds))
+
+    @ctx.room.on("participant_disconnected")
+    def _on_participant_left(p):
+        if p.identity == "phone-callee":
+            timeout_task.cancel()
+            if agent._cancelled:
+                return  # Already finalized by cancel handler
+            duration = time.time() - agent._call_start_time
+            if duration < 3:
+                disp = DispositionEnum.failed  # Immediate disconnect
+            elif agent._call_ended_normally:
+                disp = DispositionEnum.completed
+            else:
+                disp = DispositionEnum.failed  # Mid-call drop
+                if evidence:
+                    asyncio.create_task(
+                        evidence.emit_error(
+                            "mid_call_drop",
+                            f"Call dropped after {duration:.0f}s",
+                        )
+                    )
+            asyncio.create_task(agent.finalize_and_publish(disp))
 
 
 def main():
