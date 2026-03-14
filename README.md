@@ -111,6 +111,7 @@ agent = CallAgent(
     instructions="Your task...",     # What the agent should do (required)
     user_info={"name": "Alice"},     # Info the agent can reference
     caller_id="+15551234567",        # Outbound caller ID
+    voice_id="alloy",                # TTS voice (alloy/echo/fable/onyx/nova/shimmer)
     approval_required=True,          # Agent asks before sensitive actions
     timeout_seconds=600,             # Max call duration
     on_event=my_event_handler,       # Real-time event callback
