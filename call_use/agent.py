@@ -13,7 +13,6 @@ from livekit.agents import (
 )
 from livekit.agents.beta.tools import send_dtmf_events
 from livekit.plugins import deepgram, noise_cancellation, openai, silero
-from livekit.plugins.turn_detector.multilingual import MultilingualModel
 from livekit.protocol.sip import CreateSIPParticipantRequest
 
 from call_use.evidence import EvidencePipeline
@@ -128,8 +127,16 @@ class _LiveKitCallAgent(Agent):
                 name="request_user_approval",
             ))
         instructions = _build_instructions(task)
+        tts_voice = task.voice_id or "alloy"
 
-        super().__init__(instructions=instructions, tools=tools)
+        super().__init__(
+            instructions=instructions,
+            tools=tools,
+            stt=deepgram.STT(model="nova-3", language="en-US"),
+            llm=openai.LLM(model="gpt-4o"),
+            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
+            vad=silero.VAD.load(),
+        )
 
         self._task = task
         self._evidence = evidence
@@ -211,10 +218,8 @@ class _LiveKitCallAgent(Agent):
         if self._task.recording_disclaimer:
             await self.session.say(self._task.recording_disclaimer, allow_interruptions=False)
 
-        # For outbound calls, do NOT generate a greeting.
-        # The recipient (IVR/human) speaks first, and the agent
-        # automatically responds after their turn ends via the STT→LLM→TTS pipeline.
-        # This follows LiveKit's official telephony guide.
+        # Start the conversation - agent will greet based on instructions and then listen
+        self.session.generate_reply()
 
     # ---- Transcript hooks (Step 5c) ----
 
@@ -500,14 +505,9 @@ class _LiveKitCallAgent(Agent):
         self._lk_api = ctx.api
         task = self._task
 
-        # Create session with configurable voice
-        tts_voice = task.voice_id or "alloy"
+        # Models are now on the Agent (in __init__), not the session
         session = AgentSession(
-            stt=deepgram.STT(model="nova-3", language="en-US"),
-            llm=openai.LLM(model="gpt-4o"),
-            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
-            vad=silero.VAD.load(),
-            turn_detection=MultilingualModel(),
+            turn_detection="vad",
             min_endpointing_delay=0.6,
         )
 
