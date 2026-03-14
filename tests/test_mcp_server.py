@@ -26,8 +26,9 @@ async def test_do_dial_returns_task_id(MockLiveKitAPI):
 
 
 @pytest.mark.asyncio
+@patch("call_use.mcp_server.CreateAgentDispatchRequest")
 @patch("call_use.mcp_server.LiveKitAPI")
-async def test_do_dial_with_user_info(MockLiveKitAPI):
+async def test_do_dial_with_user_info(MockLiveKitAPI, MockDispatchReq):
     """dial passes user_info in dispatch metadata."""
     mock_api = AsyncMock()
     mock_api.room.create_room.return_value = MagicMock()
@@ -40,9 +41,9 @@ async def test_do_dial_with_user_info(MockLiveKitAPI):
         instructions="Cancel",
         user_info={"name": "Alice"},
     )
-    dispatch_call = mock_api.agent_dispatch.create_dispatch.call_args
-    request_obj = dispatch_call[0][0]
-    metadata = json.loads(request_obj.metadata)
+    # Extract metadata from the kwargs passed to CreateAgentDispatchRequest()
+    dispatch_kwargs = MockDispatchReq.call_args.kwargs
+    metadata = json.loads(dispatch_kwargs["metadata"])
     assert metadata["user_info"] == {"name": "Alice"}
 
 
