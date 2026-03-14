@@ -34,3 +34,4 @@ logs/
 
 # LiveKit model files
 *.onnx
+__pycache__/

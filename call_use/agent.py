@@ -561,7 +561,7 @@ class _LiveKitCallAgent(Agent):
 
         # Wait for phone participant to connect
         try:
-            participant = await asyncio.wait_for(
+            await asyncio.wait_for(
                 ctx.wait_for_participant(identity="phone-callee"),
                 timeout=60,
             )

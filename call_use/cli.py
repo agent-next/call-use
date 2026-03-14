@@ -6,7 +6,7 @@ import sys
 
 import click
 
-from call_use.models import CallEvent, DispositionEnum
+from call_use.models import CallEvent
 
 
 def _event_printer(event: CallEvent):
