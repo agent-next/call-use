@@ -145,13 +145,9 @@ class TestUserErrors:
 
         with patch(
             "call_use.cli._run_call",
-            side_effect=RuntimeError(
-                "Missing required environment variables:\n  LIVEKIT_URL"
-            ),
+            side_effect=RuntimeError("Missing required environment variables:\n  LIVEKIT_URL"),
         ):
-            result = CliRunner().invoke(
-                main, ["dial", "+18001234567", "-i", "test"]
-            )
+            result = CliRunner().invoke(main, ["dial", "+18001234567", "-i", "test"])
             assert "LIVEKIT_URL" in result.output
 
     def test_invalid_phone_number_rejected(self):
@@ -267,9 +263,7 @@ class TestCLIOutputFormat:
         result = CliRunner().invoke(main, ["dial", "+18001234567", "-i", "test"])
         # Extract JSON from output (may contain stderr too)
         lines = result.output.strip().split("\n")
-        json_start = next(
-            i for i, line in enumerate(lines) if line.strip().startswith("{")
-        )
+        json_start = next(i for i, line in enumerate(lines) if line.strip().startswith("{"))
         json_str = "\n".join(lines[json_start:])
         data = json.loads(json_str)
         assert "task_id" in data
@@ -422,9 +416,7 @@ class TestMCPUserExperience:
                     "OPENAI_API_KEY": "sk-test",
                 },
             ):
-                result = await _do_dial(
-                    phone="+18001234567", instructions="test"
-                )
+                result = await _do_dial(phone="+18001234567", instructions="test")
                 assert "task_id" in result
                 assert result["status"] == "dispatched"
                 assert "disposition" not in result  # NOT blocking
@@ -437,9 +429,7 @@ class TestMCPUserExperience:
         from call_use.mcp_server import _do_dial
 
         with patch.dict(os.environ, {}, clear=True):
-            result = await _do_dial(
-                phone="+18001234567", instructions="test"
-            )
+            result = await _do_dial(phone="+18001234567", instructions="test")
             assert "error" in result
 
 

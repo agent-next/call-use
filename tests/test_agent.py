@@ -3,7 +3,6 @@
 import asyncio
 import logging
 import sys
-import time
 from unittest.mock import AsyncMock, MagicMock
 
 # Mock livekit imports so tests work without LiveKit installed.

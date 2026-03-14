@@ -8,8 +8,6 @@ import asyncio
 import json
 import logging
 import sys
-import time
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -156,9 +154,7 @@ class TestCallLifecycle:
         await agent._set_state(CallStateEnum.connected)
         await agent.finalize_and_publish(DispositionEnum.completed)
 
-        state_events = [
-            e for e in evidence._events if e.type == CallEventType.state_change
-        ]
+        state_events = [e for e in evidence._events if e.type == CallEventType.state_change]
         transitions = [(e.data["from"], e.data["to"]) for e in state_events]
         assert ("created", "dialing") in transitions
         assert ("dialing", "connected") in transitions
@@ -332,10 +328,12 @@ class TestApprovalFlow:
         agent._approval_event = asyncio.Event()
         agent._approval_id = "apr-approve-test"
 
-        await agent._handle_approval_response({
-            "type": "approve",
-            "approval_id": "apr-approve-test",
-        })
+        await agent._handle_approval_response(
+            {
+                "type": "approve",
+                "approval_id": "apr-approve-test",
+            }
+        )
         assert agent._approval_result == "approved"
         assert agent._approval_event.is_set()
 
@@ -346,10 +344,12 @@ class TestApprovalFlow:
         agent._approval_event = asyncio.Event()
         agent._approval_id = "apr-reject-test"
 
-        await agent._handle_approval_response({
-            "type": "reject",
-            "approval_id": "apr-reject-test",
-        })
+        await agent._handle_approval_response(
+            {
+                "type": "reject",
+                "approval_id": "apr-reject-test",
+            }
+        )
         assert agent._approval_result == "rejected"
         assert agent._approval_event.is_set()
 
@@ -360,10 +360,12 @@ class TestApprovalFlow:
         agent._approval_event = asyncio.Event()
         agent._approval_id = "apr-correct"
 
-        await agent._handle_approval_response({
-            "type": "approve",
-            "approval_id": "apr-wrong",
-        })
+        await agent._handle_approval_response(
+            {
+                "type": "approve",
+                "approval_id": "apr-wrong",
+            }
+        )
         assert not agent._approval_event.is_set()
         assert agent._approval_result is None
 
@@ -372,10 +374,12 @@ class TestApprovalFlow:
         agent = _make_agent()
         agent._current_state = CallStateEnum.connected
         with caplog.at_level(logging.WARNING):
-            await agent._handle_approval_response({
-                "type": "approve",
-                "approval_id": "apr-stale",
-            })
+            await agent._handle_approval_response(
+                {
+                    "type": "approve",
+                    "approval_id": "apr-stale",
+                }
+            )
         assert any("Ignoring approval" in r.message for r in caplog.records)
 
     async def test_approval_instructions_include_tool_mention(self):
@@ -575,7 +579,7 @@ class TestEvidencePipeline:
         await evidence.emit_transcript("callee", "Test")
 
         with patch("call_use.evidence.LOGS_DIR", tmp_path):
-            outcome = evidence.finalize(DispositionEnum.completed)
+            evidence.finalize(DispositionEnum.completed)
 
         log_file = tmp_path / f"{task.task_id}.json"
         assert log_file.exists()
@@ -729,6 +733,7 @@ class TestCLIBehavior:
     def test_invalid_json_user_info_exits_2(self):
         """Given --user-info 'not-json', should exit 2 (input error)."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -738,6 +743,7 @@ class TestCLIBehavior:
     def test_completed_call_exits_0(self):
         """Given disposition=completed, exit code should be 0."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -755,6 +761,7 @@ class TestCLIBehavior:
     def test_voicemail_exits_0(self):
         """Given disposition=voicemail, exit code should be 0 (expected outcome)."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -772,6 +779,7 @@ class TestCLIBehavior:
     def test_failed_call_exits_1(self):
         """Given disposition=failed, exit code should be 1."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -789,6 +797,7 @@ class TestCLIBehavior:
     def test_json_output_to_stdout(self):
         """Given successful call, stdout should be parseable JSON with task_id, disposition."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -819,6 +828,7 @@ class TestCLIBehavior:
     def test_timeout_disposition_exits_1(self):
         """Given disposition=timeout, exit code should be 1 (unexpected outcome)."""
         from click.testing import CliRunner
+
         from call_use.cli import main
 
         runner = CliRunner()
@@ -842,13 +852,16 @@ class TestCLIBehavior:
 class TestMCPBehavior:
     """Given MCP tool calls, test async behavior."""
 
-    @patch.dict("os.environ", {
-        "LIVEKIT_URL": "wss://test",
-        "LIVEKIT_API_KEY": "key",
-        "LIVEKIT_API_SECRET": "secret",
-        "SIP_TRUNK_ID": "trunk",
-        "OPENAI_API_KEY": "sk-test",
-    })
+    @patch.dict(
+        "os.environ",
+        {
+            "LIVEKIT_URL": "wss://test",
+            "LIVEKIT_API_KEY": "key",
+            "LIVEKIT_API_SECRET": "secret",
+            "SIP_TRUNK_ID": "trunk",
+            "OPENAI_API_KEY": "sk-test",
+        },
+    )
     @patch("call_use.mcp_server.LiveKitAPI")
     async def test_dial_returns_immediately_with_task_id(self, MockLiveKitAPI):
         """Given dial call, should return task_id without waiting for call to complete."""
@@ -905,16 +918,18 @@ class TestMCPBehavior:
 
         mock_api = AsyncMock()
         mock_room = MagicMock()
-        mock_room.metadata = json.dumps({
-            "state": "ended",
-            "outcome": {
-                "task_id": "call-done",
-                "disposition": "completed",
-                "duration_seconds": 30.0,
-                "transcript": [{"speaker": "agent", "text": "Hello"}],
-                "events": [],
-            },
-        })
+        mock_room.metadata = json.dumps(
+            {
+                "state": "ended",
+                "outcome": {
+                    "task_id": "call-done",
+                    "disposition": "completed",
+                    "duration_seconds": 30.0,
+                    "transcript": [{"speaker": "agent", "text": "Hello"}],
+                    "events": [],
+                },
+            }
+        )
         mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
         MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
         MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
