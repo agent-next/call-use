@@ -1,19 +1,11 @@
 """Tests for call_use.server — Step 6."""
 
+# LiveKit base mocks are set up in conftest.py (shared across all test files).
+
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# Mock livekit modules before importing server
-for mod in [
-    "livekit",
-    "livekit.api",
-    "livekit.protocol",
-    "livekit.protocol.models",
-    "dotenv",
-]:
-    sys.modules.setdefault(mod, MagicMock())
 
 # We need to mock LiveKitAPI as an async context manager
 mock_livekit_api = MagicMock()

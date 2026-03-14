@@ -1,58 +1,18 @@
 """Tests for call_use.agent — Step 5a agent state machine."""
 
+# LiveKit mocks are set up in conftest.py (shared across all test files).
+
 import asyncio
 import logging
-import sys
 from unittest.mock import AsyncMock, MagicMock
 
-# Mock livekit imports so tests work without LiveKit installed.
-_livekit_mock = MagicMock()
-_livekit_agents_mock = MagicMock()
-
-
-class _FakeAgent:
-    """Minimal stand-in for livekit.agents.Agent."""
-
-    def __init__(self, *args, **kwargs):
-        self._session = None
-
-    @property
-    def session(self):
-        return self._session
-
-
-_livekit_agents_mock.Agent = _FakeAgent
-# function_tool must be callable — return identity for non-decorator usage,
-# and also work as @function_tool decorator.
-_livekit_agents_mock.function_tool = lambda fn=None, **kw: fn if fn else (lambda f: f)
-
-for mod in [
-    "livekit",
-    "livekit.api",
-    "livekit.rtc",
-    "livekit.agents",
-    "livekit.agents.beta",
-    "livekit.agents.beta.tools",
-    "livekit.plugins",
-    "livekit.plugins.openai",
-    "livekit.plugins.deepgram",
-    "livekit.plugins.silero",
-    "livekit.plugins.noise_cancellation",
-    "livekit.plugins.turn_detector",
-    "livekit.plugins.turn_detector.multilingual",
-    "livekit.protocol",
-    "livekit.protocol.sip",
-    "dotenv",
-]:
-    sys.modules.setdefault(mod, MagicMock() if mod != "livekit.agents" else _livekit_agents_mock)
-
-from call_use.agent import (  # noqa: E402
+from call_use.agent import (
     _HANG_UP_REASONS,
     _build_instructions,
     _LiveKitCallAgent,
 )
-from call_use.evidence import EvidencePipeline  # noqa: E402
-from call_use.models import CallStateEnum, CallTask, DispositionEnum  # noqa: E402
+from call_use.evidence import EvidencePipeline
+from call_use.models import CallStateEnum, CallTask, DispositionEnum
 
 # ---------------------------------------------------------------------------
 # Helpers

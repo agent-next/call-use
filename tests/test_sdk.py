@@ -1,22 +1,10 @@
 """Tests for call_use.sdk — Step 10 CallAgent SDK class."""
 
-import sys
-from unittest.mock import MagicMock
+# LiveKit mocks are set up in conftest.py (shared across all test files).
 
 import pytest
 
-# Mock livekit before import
-for mod in [
-    "livekit",
-    "livekit.api",
-    "livekit.rtc",
-    "livekit.protocol",
-    "livekit.protocol.models",
-    "dotenv",
-]:
-    sys.modules.setdefault(mod, MagicMock())
-
-from call_use.sdk import CallAgent  # noqa: E402
+from call_use.sdk import CallAgent
 
 
 class TestCallAgentConstructor:

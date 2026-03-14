@@ -4,62 +4,21 @@ Each test class covers a real-world scenario with descriptive Given/When/Then
 docstrings that read like behavior specs.
 """
 
+# LiveKit mocks are set up in conftest.py (shared across all test files).
+
 import asyncio
 import json
 import logging
-import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# ---------------------------------------------------------------------------
-# Mock livekit imports (same pattern as test_agent.py)
-# ---------------------------------------------------------------------------
-
-_livekit_mock = MagicMock()
-_livekit_agents_mock = MagicMock()
-
-
-class _FakeAgent:
-    """Minimal stand-in for livekit.agents.Agent."""
-
-    def __init__(self, *args, **kwargs):
-        self._session = None
-
-    @property
-    def session(self):
-        return self._session
-
-
-_livekit_agents_mock.Agent = _FakeAgent
-_livekit_agents_mock.function_tool = lambda fn=None, **kw: fn if fn else (lambda f: f)
-
-for mod in [
-    "livekit",
-    "livekit.api",
-    "livekit.rtc",
-    "livekit.agents",
-    "livekit.agents.beta",
-    "livekit.agents.beta.tools",
-    "livekit.plugins",
-    "livekit.plugins.openai",
-    "livekit.plugins.deepgram",
-    "livekit.plugins.silero",
-    "livekit.plugins.noise_cancellation",
-    "livekit.plugins.turn_detector",
-    "livekit.plugins.turn_detector.multilingual",
-    "livekit.protocol",
-    "livekit.protocol.sip",
-    "dotenv",
-]:
-    sys.modules.setdefault(mod, MagicMock() if mod != "livekit.agents" else _livekit_agents_mock)
-
-from call_use.agent import (  # noqa: E402
+from call_use.agent import (
     _build_instructions,
     _LiveKitCallAgent,
 )
-from call_use.evidence import EvidencePipeline  # noqa: E402
-from call_use.models import (  # noqa: E402
+from call_use.evidence import EvidencePipeline
+from call_use.models import (
     CallEvent,
     CallEventType,
     CallOutcome,
