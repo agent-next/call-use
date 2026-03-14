@@ -495,7 +495,7 @@ async def test_dial_free_tier_800_number(mock_dispatch, mock_validate, app):
         user_id="123", github_login="testuser", api_key="cu_test",
         tier=UserTier.free,
     )
-    mock_dispatch.return_value = {"task_id": "test-123", "status": "dispatched"}
+    mock_dispatch.return_value = {"task_id": "test-123", "status": "dispatched", "monitor_token": "test-123"}
 
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
@@ -555,7 +555,7 @@ from fastapi import FastAPI, HTTPException, Header
 
 from call_use.phone import validate_phone_number
 from cloud.auth import validate_api_key, github_oauth_callback
-from cloud.config import SANDBOX_CALLER_ID, LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, SIP_TRUNK_ID
+from cloud.config import SANDBOX_CALLER_ID, LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET
 from cloud.models import CloudCallRequest, CloudCallResponse, CloudUser, UserTier
 from cloud.rate_limit import check_and_increment_rate_limit, check_phone_allowed, CloudRateLimitError
 
@@ -577,25 +577,34 @@ def create_cloud_app() -> FastAPI:
         return {"status": "ok"}
 
     @app.get("/auth/github")
-    async def github_auth_start():
-        """Redirect to GitHub OAuth."""
+    async def github_auth_start(redirect_port: int | None = None):
+        """Redirect to GitHub OAuth.
+
+        If `redirect_port` is provided (from CLI local callback server),
+        it's threaded through the GitHub OAuth `state` parameter so the
+        callback can redirect the API key back to localhost.
+        """
         client_id = os.environ.get("GITHUB_CLIENT_ID", "")
-        return {"url": f"https://github.com/login/oauth/authorize?client_id={client_id}&scope=read:user"}
+        oauth_url = f"https://github.com/login/oauth/authorize?client_id={client_id}&scope=read:user"
+        if redirect_port is not None:
+            oauth_url += f"&state={redirect_port}"
+        return {"url": oauth_url}
 
     @app.get("/auth/github/callback")
-    async def github_auth_callback(code: str, port: int | None = None):
+    async def github_auth_callback(code: str, state: str | None = None):
         """Handle GitHub OAuth callback, return API key.
 
-        If `port` query param is present, redirects to the CLI's local
+        If `state` contains a port number (passed via GitHub OAuth state
+        parameter from /auth/github), redirects to the CLI's local
         callback server instead of displaying JSON in the browser.
         """
         user = await github_oauth_callback(code)
 
-        # If CLI provided a local callback port, redirect the API key there
-        if port:
+        # If CLI provided a local callback port via OAuth state, redirect the API key there
+        if state and state.isdigit():
             from fastapi.responses import RedirectResponse
             return RedirectResponse(
-                url=f"http://localhost:{port}/callback?api_key={user.api_key}&tier={user.tier.value}"
+                url=f"http://localhost:{state}/callback?api_key={user.api_key}&tier={user.tier.value}"
             )
 
         return {
@@ -706,32 +715,35 @@ async def _dispatch_call(user: CloudUser, req: CloudCallRequest, caller_id: str 
 
     Creates a LiveKit room and dispatches the call-use agent into it,
     then returns immediately. This mirrors the self-hosted server.py
-    pattern (agent_dispatch.create_dispatch()) and does NOT block for
-    the call duration (which can be up to 600 seconds).
+    pattern (lkapi.agent_dispatch.create_dispatch()) and does NOT block
+    for the call duration (which can be up to 600 seconds).
 
     The agent writes its outcome to the room metadata, which can be
     polled via GET /v1/calls/{task_id}.
     """
+    from livekit import api as lk_proto
     from livekit.api import LiveKitAPI
-    from call_use.agent_dispatch import create_dispatch
 
     task_id = f"cu-{uuid.uuid4().hex[:12]}"
 
-    lk = LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-    try:
-        # Fire-and-forget: create room + dispatch agent, return immediately
-        await create_dispatch(
-            lk=lk,
-            room_name=task_id,
-            phone=req.phone,
-            instructions=req.instructions,
-            user_info=req.user_info,
-            caller_id=caller_id,
-            voice_id=req.voice_id,
-            sip_trunk_id=SIP_TRUNK_ID,
+    async with LiveKitAPI() as lkapi:
+        # Fire-and-forget: dispatch agent into room, return immediately.
+        # sip_trunk_id is NOT passed here — it's configured in the
+        # LiveKit SIP trunk setup, not per-call.
+        await lkapi.agent_dispatch.create_dispatch(
+            lk_proto.CreateAgentDispatchRequest(
+                agent_name="call-use-agent",
+                room=task_id,
+                metadata=json.dumps({
+                    "phone_number": req.phone,
+                    "caller_id": caller_id,
+                    "instructions": req.instructions,
+                    "user_info": req.user_info or {},
+                    "voice_id": req.voice_id,
+                    "timeout_seconds": req.timeout,
+                }),
+            )
         )
-    finally:
-        await lk.aclose()
 
     logger.info(
         "agent_dispatched",
@@ -895,8 +907,11 @@ def start_github_auth() -> str:
             return f"API key saved. Run: export CALLUSE_API_KEY='{manual_key}'"
         return "Authentication cancelled."
 
-    # Wait for callback
-    server.handle_request()
+    # Wait for callback — loop to handle spurious requests (e.g. /favicon.ico)
+    import time
+    deadline = time.time() + 120
+    while not captured_key and time.time() < deadline:
+        server.handle_request()
     server.server_close()
 
     if "api_key" in captured_key:
@@ -1102,3 +1117,10 @@ This plan incorporates fixes for the following review findings:
 8. **MEDIUM: Supabase stubs** — Task 2 now includes SQL schema, `cloud/db.py`, and real Supabase queries in auth.py.
 9. **MEDIUM: No observability** — Added `sentry-sdk`, structured logging with `call_id`/`user_id`, cost tracking note.
 10. **MEDIUM: Unpinned git dep** — Dockerfile uses `COPY + pip install .` from local source. Requirements note for PyPI after publication.
+
+### Round 2 Findings
+
+11. **HIGH: OAuth `redirect_port` lost** — `/auth/github` now accepts `redirect_port` query param and threads it through GitHub OAuth `state` parameter. `/auth/github/callback` reads `state` to get the port and redirects API key to `localhost:{state}`.
+12. **CRITICAL: `call_use.agent_dispatch` does not exist** — `_dispatch_call` now uses the LiveKit API directly (`lkapi.agent_dispatch.create_dispatch` with `CreateAgentDispatchRequest`), matching the pattern in `sdk.py` and `server.py`. Removed `sip_trunk_id` from dispatch (configured in SIP trunk setup, not per-call).
+13. **MEDIUM: OAuth callback server single-shot** — `handle_request()` now loops with a 120s deadline until `captured_key` is populated, preventing `/favicon.ico` from consuming the only request.
+14. **LOW: Test mock missing `monitor_token`** — Added `"monitor_token": "test-123"` to `mock_dispatch.return_value` to match `CloudCallResponse` model.
