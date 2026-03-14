@@ -127,16 +127,7 @@ class _LiveKitCallAgent(Agent):
                 name="request_user_approval",
             ))
         instructions = _build_instructions(task)
-        tts_voice = task.voice_id or "alloy"
-
-        super().__init__(
-            instructions=instructions,
-            tools=tools,
-            stt=deepgram.STT(model="nova-3", language="en-US"),
-            llm=openai.LLM(model="gpt-4o"),
-            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
-            vad=silero.VAD.load(),
-        )
+        super().__init__(instructions=instructions, tools=tools)
 
         self._task = task
         self._evidence = evidence
@@ -214,12 +205,8 @@ class _LiveKitCallAgent(Agent):
         await self._set_state(CallStateEnum.connected)
         await self._update_metadata("connected")
 
-        # Recording disclaimer goes first via say() (skips LLM, straight to TTS)
         if self._task.recording_disclaimer:
             await self.session.say(self._task.recording_disclaimer, allow_interruptions=False)
-
-        # Start the conversation - agent will greet based on instructions and then listen
-        self.session.generate_reply()
 
     # ---- Transcript hooks (Step 5c) ----
 
@@ -505,8 +492,12 @@ class _LiveKitCallAgent(Agent):
         self._lk_api = ctx.api
         task = self._task
 
-        # Models are now on the Agent (in __init__), not the session
+        tts_voice = task.voice_id or "alloy"
         session = AgentSession(
+            stt=deepgram.STT(model="nova-3", language="en-US"),
+            llm=openai.LLM(model="gpt-4o"),
+            tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
+            vad=silero.VAD.load(),
             turn_detection="vad",
             min_endpointing_delay=0.6,
         )
@@ -600,6 +591,13 @@ class _LiveKitCallAgent(Agent):
                         keys = (call.arguments or {}).get("keys", "")
                         if keys:
                             asyncio.create_task(self._evidence.emit_dtmf(keys))
+
+        # Initial greeting — called AFTER session.start(), NOT in on_enter()
+        # (on_enter generate_reply is known to produce inaudible output — issue #2710)
+        session.generate_reply(
+            instructions="Greet the person who answered. Say hi, give your first name, "
+            "and in one sentence explain why you're calling. Be natural and brief."
+        )
 
         # Timeout guard
         timeout_task = asyncio.create_task(self._timeout_guard(task.timeout_seconds))
