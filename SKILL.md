@@ -14,6 +14,10 @@ You have the ability to make outbound phone calls on behalf of the user.
 - User needs to navigate a phone menu (IVR) or talk to customer service
 - Any task that requires talking to someone on the phone
 
+**Note:** MCP tools currently run with `approval_required=False`. For calls requiring human approval
+(refunds, cancellations involving money), use the CLI with `--approval-required` or the Python SDK
+with `approval_required=True` and an `on_approval` callback instead.
+
 ## How to use
 
 ### Option 1: MCP tools (preferred if available)
@@ -70,7 +74,7 @@ outcome = await CallAgent(
 3. **US/Canada numbers only** (E.164 format: +1XXXXXXXXXX)
 4. **Be specific in instructions** — tell the agent exactly what to do, what info to provide
 5. **Include user_info** when the agent needs to verify identity (name, account number, etc.)
-6. **Set approval_required=True** for sensitive actions (refunds, cancellations involving money)
+6. **For sensitive actions (refunds, cancellations involving money):** MCP does not support `approval_required` — use the CLI with `--approval-required` or the Python SDK with `approval_required=True` and an `on_approval` callback
 
 ## Dispositions
 
