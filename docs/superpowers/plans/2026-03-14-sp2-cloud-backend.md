@@ -669,23 +669,23 @@ def create_cloud_app() -> FastAPI:
         if not authorization or not authorization.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing API key")
 
+        from livekit import api as lk_proto
         from livekit.api import LiveKitAPI
 
-        lk = LiveKitAPI(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET)
-        try:
-            room = await lk.room.list_rooms(names=[task_id])
-            if not room or not room.rooms:
+        async with LiveKitAPI() as lkapi:
+            rooms = await lkapi.room.list_rooms(
+                lk_proto.ListRoomsRequest(names=[task_id])
+            )
+            if not rooms.rooms:
                 raise HTTPException(status_code=404, detail="Call not found")
 
-            room_data = room.rooms[0]
+            room_data = rooms.rooms[0]
             metadata = json.loads(room_data.metadata) if room_data.metadata else {}
             return {
                 "task_id": task_id,
                 "status": metadata.get("status", "in_progress"),
                 "outcome": metadata.get("outcome"),
             }
-        finally:
-            await lk.aclose()
 
     # Optional: SSE endpoint for real-time streaming (future enhancement)
     # @app.get("/v1/calls/{task_id}/events")
