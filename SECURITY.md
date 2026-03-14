@@ -22,3 +22,4 @@ We will respond within 48 hours and work with you on a fix.
 - **API keys**: Never commit `.env` files. Use `.env.example` as a template
 - **Call recordings**: Transcripts may contain PII. Handle logs in `~/.call-use/logs/` accordingly
 - **SIP trunk**: Secure your Twilio SIP trunk credentials
+- **Caller ID**: v0.1 only validates caller ID format (E.164). It does NOT verify ownership. Spoofing is possible. Caller ID verification (via Twilio Lookup API) is planned for v0.2.
