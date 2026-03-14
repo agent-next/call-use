@@ -12,4 +12,5 @@
 - Human takeover: pause agent mid-call, take over the conversation
 - Phone validation: E.164 NANP format, blocks premium/Caribbean numbers
 - JSON audit logs per call
+- Agent skill: `skill.md` for Claude Code and compatible agent frameworks
 - Framework examples: LangChain, OpenAI Agents SDK, Claude Code MCP setup

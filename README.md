@@ -219,6 +219,14 @@ app = create_app(api_key="your-secret-key")
 
 All endpoints require `X-API-Key` header.
 
+## Examples
+
+- [LangChain tool](examples/langchain_tool.py) — Use call-use as a LangChain tool
+- [OpenAI Agents SDK](examples/openai_agents.py) — Integrate with OpenAI Agents
+- [Claude Code MCP setup](examples/claude_code_setup.md) — Configure call-use as an MCP server
+- [Customer service refund agent](examples/cs_refund_agent.py) — End-to-end refund automation
+- [Skill](skill.md) — Claude Code / agent skill for automatic phone call capability
+
 ## Development
 
 ```bash
