@@ -2,11 +2,28 @@
 
 import asyncio
 import json
+import os
 import sys
 
 import click
 
-from call_use.models import CallEvent, DispositionEnum
+from call_use.models import CallEvent
+
+
+def _check_env():
+    """Check required environment variables before attempting a call."""
+    required = {
+        "LIVEKIT_URL": "LiveKit server URL (wss://...)",
+        "LIVEKIT_API_KEY": "LiveKit API key",
+        "LIVEKIT_API_SECRET": "LiveKit API secret",
+        "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
+        "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
+    }
+    missing = [f"  {k} — {v}" for k, v in required.items() if not os.environ.get(k)]
+    if missing:
+        msg = "Missing required environment variables:\n" + "\n".join(missing)
+        msg += "\n\nSee: https://github.com/agent-next/call-use#configure"
+        raise RuntimeError(msg)
 
 
 def _event_printer(event: CallEvent):
@@ -40,6 +57,11 @@ def _run_call(
     approval_required: bool = False,
 ) -> dict:
     """Run a call synchronously via CallAgent. Returns outcome dict."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+    _check_env()
+
     from call_use.sdk import CallAgent
 
     kwargs = dict(
@@ -72,9 +94,16 @@ def main():
 @click.option("--instructions", "-i", required=True, help="What the agent should do on the call.")
 @click.option("--user-info", "-u", default=None, help="JSON dict of context for the agent.")
 @click.option("--caller-id", default=None, help="Outbound caller ID (E.164).")
-@click.option("--voice-id", default=None, help="TTS voice (alloy, echo, fable, onyx, nova, shimmer).")
+@click.option(
+    "--voice-id", default=None, help="TTS voice (alloy, echo, fable, onyx, nova, shimmer)."
+)
 @click.option("--timeout", default=600, type=int, help="Max call duration in seconds.")
-@click.option("--approval-required", is_flag=True, default=False, help="Require approval for sensitive actions.")
+@click.option(
+    "--approval-required",
+    is_flag=True,
+    default=False,
+    help="Require approval for sensitive actions.",
+)
 def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_required):
     """Make an outbound phone call.
 
@@ -106,6 +135,15 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
             timeout=timeout,
             approval_required=approval_required,
         )
+    except ValueError as e:
+        click.echo(f"Invalid phone number: {e}", err=True)
+        sys.exit(2)
+    except RuntimeError as e:
+        click.echo(str(e), err=True)
+        sys.exit(1)
+    except ConnectionError as e:
+        click.echo(f"Could not connect to LiveKit: {e}", err=True)
+        sys.exit(1)
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
         sys.exit(1)
@@ -120,7 +158,9 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
 
 @main.command()
 @click.option("--github", is_flag=True, help="Authenticate via GitHub OAuth (free tier).")
-@click.option("--phone", "phone_number", default=None, help="Verify phone number via SMS (paid tier).")
+@click.option(
+    "--phone", "phone_number", default=None, help="Verify phone number via SMS (paid tier)."
+)
 def auth(github, phone_number):
     """Authenticate with call-use cloud for zero-config calling.
 
@@ -130,9 +170,20 @@ def auth(github, phone_number):
         --phone     Paid tier: bind your own caller ID via SMS
     """
     if github:
-        click.echo("call-use cloud auth coming soon. For now, set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env", err=True)
+        click.echo(
+            "call-use cloud auth coming soon. For now, set LIVEKIT_URL, LIVEKIT_API_KEY,"
+            " LIVEKIT_API_SECRET in .env",
+            err=True,
+        )
         sys.exit(0)
     if phone_number:
-        click.echo("Phone verification coming soon. For now, set your caller ID via --caller-id flag.", err=True)
+        click.echo(
+            "Phone verification coming soon. For now, set your caller ID via --caller-id flag.",
+            err=True,
+        )
         sys.exit(0)
-    click.echo("Run 'call-use auth --github' for free tier or 'call-use auth --phone +1...' for paid tier.", err=True)
+    click.echo(
+        "Run 'call-use auth --github' for free tier"
+        " or 'call-use auth --phone +1...' for paid tier.",
+        err=True,
+    )

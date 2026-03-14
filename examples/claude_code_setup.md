@@ -14,8 +14,7 @@ Add to your `~/.claude/settings.json`:
         "LIVEKIT_API_KEY": "your-key",
         "LIVEKIT_API_SECRET": "your-secret",
         "SIP_TRUNK_ID": "your-trunk-id",
-        "OPENAI_API_KEY": "sk-...",
-        "DEEPGRAM_API_KEY": "..."
+        "OPENAI_API_KEY": "sk-..."
       }
     }
   }

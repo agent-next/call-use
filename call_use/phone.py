@@ -7,19 +7,54 @@ import re
 _E164_NANP_RE = re.compile(r"\+1[2-9]\d{2}[2-9]\d{6}")
 
 # Caribbean / Atlantic NPAs
-_CARIBBEAN_ATLANTIC_NPAS = frozenset({
-    "242", "246", "264", "268", "284", "340", "345", "441", "473",
-    "649", "658", "664", "721", "758", "767", "784", "787", "809",
-    "829", "849", "868", "869", "876", "939",
-})
+_CARIBBEAN_ATLANTIC_NPAS = frozenset(
+    {
+        "242",
+        "246",
+        "264",
+        "268",
+        "284",
+        "340",
+        "345",
+        "441",
+        "473",
+        "649",
+        "658",
+        "664",
+        "721",
+        "758",
+        "767",
+        "784",
+        "787",
+        "809",
+        "829",
+        "849",
+        "868",
+        "869",
+        "876",
+        "939",
+    }
+)
 
 # Pacific NPAs
 _PACIFIC_NPAS = frozenset({"670", "671", "684"})
 
 # Non-geographic NPAs
-_NON_GEOGRAPHIC_NPAS = frozenset({
-    "456", "500", "521", "522", "533", "544", "566", "577", "588", "600", "700",
-})
+_NON_GEOGRAPHIC_NPAS = frozenset(
+    {
+        "456",
+        "500",
+        "521",
+        "522",
+        "533",
+        "544",
+        "566",
+        "577",
+        "588",
+        "600",
+        "700",
+    }
+)
 
 _DENIED_NPAS = _CARIBBEAN_ATLANTIC_NPAS | _PACIFIC_NPAS | _NON_GEOGRAPHIC_NPAS
 
@@ -50,9 +85,7 @@ def validate_phone_number(number: str) -> str:
     exchange = number[5:8]
 
     if area_code in _DENIED_NPAS:
-        raise ValueError(
-            f"Denied area code {area_code}: Caribbean, Pacific, or non-geographic NPA"
-        )
+        raise ValueError(f"Denied area code {area_code}: Caribbean, Pacific, or non-geographic NPA")
 
     if area_code == "900" or exchange == "976" or area_code == "976":
         raise ValueError(
