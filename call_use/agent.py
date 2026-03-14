@@ -553,14 +553,29 @@ class _LiveKitCallAgent(Agent):
             await ctx.api.sip.create_sip_participant(sip_request)
         except Exception as e:
             error_msg = str(e).lower()
-            if "busy" in error_msg:
-                disp = DispositionEnum.busy
-            elif "no answer" in error_msg or "timeout" in error_msg:
-                disp = DispositionEnum.no_answer
-            elif "voicemail" in error_msg:
-                disp = DispositionEnum.voicemail
-            else:
-                disp = DispositionEnum.failed
+            sip_status = ""
+            if hasattr(e, "metadata"):
+                sip_status = getattr(e, "metadata", {}).get("sip_status_code", "")
+
+            # Map SIP status codes to dispositions
+            SIP_DISPOSITION_MAP = {
+                "486": DispositionEnum.busy,       # Busy Here
+                "480": DispositionEnum.no_answer,   # Temporarily Unavailable
+                "408": DispositionEnum.no_answer,   # Request Timeout
+                "487": DispositionEnum.cancelled,   # Request Terminated
+            }
+
+            disp = SIP_DISPOSITION_MAP.get(sip_status, DispositionEnum.failed)
+
+            # Fallback to string matching for non-SIP errors
+            if disp == DispositionEnum.failed:
+                if "busy" in error_msg:
+                    disp = DispositionEnum.busy
+                elif "no answer" in error_msg or "timeout" in error_msg:
+                    disp = DispositionEnum.no_answer
+                elif "voicemail" in error_msg:
+                    disp = DispositionEnum.voicemail
+
             if self._evidence:
                 await self._evidence.emit_error("dial_failed", str(e))
             await self.finalize_and_publish(disp)
