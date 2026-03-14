@@ -153,6 +153,46 @@ outcome.transcript       # List of {speaker, text} dicts
 outcome.events           # List of CallEvent dicts
 ```
 
+## CLI
+
+Any agent that can run bash can make phone calls:
+
+```bash
+pip install call-use
+call-use dial "+18001234567" -i "Ask about store hours"
+```
+
+Events stream to stderr, structured JSON result goes to stdout:
+
+```bash
+call-use dial "+18001234567" -i "Cancel subscription" -u '{"account": "12345"}'
+# stdout: {"task_id": "...", "disposition": "completed", "transcript": [...]}
+```
+
+## MCP Server
+
+Native tool integration for Claude Code, Codex, and other MCP-compatible agents:
+
+```json
+{
+  "mcpServers": {
+    "call-use": {
+      "command": "call-use-mcp",
+      "env": {
+        "LIVEKIT_URL": "wss://...",
+        "LIVEKIT_API_KEY": "...",
+        "LIVEKIT_API_SECRET": "...",
+        "SIP_TRUNK_ID": "...",
+        "OPENAI_API_KEY": "...",
+        "DEEPGRAM_API_KEY": "..."
+      }
+    }
+  }
+}
+```
+
+4 async tools: `dial` (non-blocking, returns task_id), `status`, `cancel`, `result`.
+
 ## REST API
 
 For multi-tenant or server deployments:
