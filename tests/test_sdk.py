@@ -68,6 +68,26 @@ class TestCallAgentConstructor:
         assert agent._user_info == {}
 
 
+    def test_empty_instructions_accepted(self):
+        """Empty instructions are technically valid (agent uses defaults)."""
+        agent = CallAgent(phone="+18002234567", instructions="", approval_required=False)
+        assert agent._instructions == ""
+
+    def test_very_long_instructions_accepted(self):
+        """Long instructions should not crash."""
+        long_text = "Do this. " * 1000
+        agent = CallAgent(phone="+18002234567", instructions=long_text, approval_required=False)
+        assert len(agent._instructions) > 5000
+
+    def test_user_info_with_special_characters(self):
+        """User info with unicode and special chars should work."""
+        agent = CallAgent(
+            phone="+18002234567", instructions="test", approval_required=False,
+            user_info={"name": "José García", "notes": "账号 12345"},
+        )
+        assert agent._user_info["name"] == "José García"
+
+
 class TestCallAgentCommands:
     async def test_send_command_raises_without_active_call(self):
         agent = CallAgent(

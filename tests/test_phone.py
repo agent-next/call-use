@@ -43,6 +43,22 @@ class TestValidatePhoneNumber:
         with pytest.raises(ValueError, match="phone_number must be a string"):
             validate_phone_number(12125551234)  # type: ignore[arg-type]
 
+    def test_too_short_number_rejected(self):
+        """Numbers with fewer than 10 digits after +1 are rejected."""
+        with pytest.raises(ValueError):
+            validate_phone_number("+1800123")
+
+    def test_too_long_number_rejected(self):
+        """Numbers with more than 10 digits after +1 are rejected."""
+        with pytest.raises(ValueError):
+            validate_phone_number("+180012345678")
+
+    def test_valid_toll_free_numbers(self):
+        """All toll-free prefixes are accepted."""
+        for prefix in ["800", "888", "877", "866", "855", "844", "833"]:
+            result = validate_phone_number(f"+1{prefix}2234567")
+            assert result == f"+1{prefix}2234567"
+
 
 class TestValidateCallerId:
     def test_none_returns_none(self):

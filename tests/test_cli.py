@@ -93,3 +93,20 @@ def test_dial_no_answer_returns_zero(mock_run):
     runner = CliRunner()
     result = runner.invoke(main, ["dial", "+18005551234", "--instructions", "Ask about hours"])
     assert result.exit_code == 0
+
+
+@patch("call_use.cli._run_call")
+def test_dial_runtime_error_exits_1(mock_run):
+    """Runtime errors (network, LiveKit down) exit 1, not 2."""
+    mock_run.side_effect = RuntimeError("LiveKit connection refused")
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test"])
+    assert result.exit_code == 1  # NOT 2 (input error)
+    assert "LiveKit connection refused" in result.output
+
+
+def test_dial_invalid_json_user_info_exits_2():
+    """Malformed --user-info JSON exits 2 (input error)."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "-u", "not-json"])
+    assert result.exit_code == 2

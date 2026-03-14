@@ -127,6 +127,17 @@ async def test_finalize_writes_json(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_finalize_twice_is_safe():
+    """Calling finalize twice should not crash or duplicate."""
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hello")
+    outcome1 = pipe.finalize(DispositionEnum.completed)
+    outcome2 = pipe.finalize(DispositionEnum.failed)
+    # Both calls should succeed and share the same task_id
+    assert outcome1.task_id == outcome2.task_id
+
+
+@pytest.mark.asyncio
 async def test_empty_pipeline_finalizes():
     pipe = _make_pipeline()
     outcome = pipe.finalize(DispositionEnum.cancelled)

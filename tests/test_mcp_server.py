@@ -135,6 +135,18 @@ async def test_do_result_in_progress(MockLiveKitAPI):
 
 @pytest.mark.asyncio
 @patch("call_use.mcp_server.LiveKitAPI")
+async def test_do_dial_livekit_connection_error(MockLiveKitAPI):
+    """dial returns error JSON when LiveKit is unreachable."""
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(side_effect=ConnectionError("refused"))
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+    from call_use.mcp_server import dial
+    result_str = await dial(phone="+18005551234", instructions="test")
+    result = json.loads(result_str)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
 async def test_cancel_sends_command(MockLiveKitAPI):
     """cancel tool sends cancel command via data channel."""
     mock_api = AsyncMock()

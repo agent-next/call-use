@@ -223,6 +223,79 @@ class TestGetCallUnknown:
 # 8: POST /calls/{id}/inject missing message → 400
 # ===========================================================================
 
+class TestCreateCallEmptyInstructions:
+    def test_empty_instructions_returns_200(self, client, headers):
+        """POST /calls with empty instructions still succeeds (uses default)."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "",
+                },
+                headers=headers,
+            )
+        # Empty string is valid — the model has a default, but explicit empty is OK
+        assert resp.status_code == 200
+
+
+class TestCreateCallLongPhone:
+    def test_very_long_phone_returns_400(self, client, headers):
+        """POST /calls with a very long phone number returns 400."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+1" + "5" * 20,
+                "instructions": "Test",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 400
+
+
+class TestRateLimiting:
+    def test_rate_limit_triggers(self, headers):
+        """Rate limiter returns 429 after exceeding max calls."""
+        # Create app with low rate limit
+        app = create_app(api_key=API_KEY)
+
+        # Override rate limiter to a very low limit
+        from call_use.rate_limit import RateLimiter
+        for route in app.routes:
+            pass  # just need the app
+
+        client = TestClient(app)
+
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ), patch.dict(os.environ, {"RATE_LIMIT_MAX": "2", "RATE_LIMIT_WINDOW": "3600"}):
+            # Create app with low rate limit
+            app2 = create_app(api_key=API_KEY)
+            client2 = TestClient(app2)
+
+            for i in range(3):
+                resp = client2.post(
+                    "/calls",
+                    json={
+                        "phone_number": "+12025551234",
+                        "instructions": "Test",
+                    },
+                    headers=headers,
+                )
+                if i < 2:
+                    assert resp.status_code == 200, f"Call {i} should succeed"
+                else:
+                    assert resp.status_code == 429, "Third call should be rate limited"
+
+
 class TestInjectMissingMessage:
     def test_inject_missing_message_returns_400(self, client, headers):
         """POST /calls/{id}/inject without a message field returns 400."""
