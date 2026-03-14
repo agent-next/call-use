@@ -78,14 +78,14 @@ def create_app(api_key: str | None = None) -> FastAPI:
         agent_id = metadata.get("agent_identity")
         if not agent_id:
             raise HTTPException(409, "Agent not yet initialized")
-        return agent_id
+        return str(agent_id)
 
     async def _get_room_state(lkapi: LiveKitAPI, room_name: str) -> str:
         rooms = await lkapi.room.list_rooms(api.ListRoomsRequest(names=[room_name]))
         if not rooms.rooms:
             raise HTTPException(404, "Room not found")
         metadata = json.loads(rooms.rooms[0].metadata or "{}")
-        return metadata.get("state", "unknown")
+        return str(metadata.get("state", "unknown"))
 
     def _get_room_name(call_id: str) -> str:
         room_name = call_rooms.get(call_id)

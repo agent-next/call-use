@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+from typing import Any
 
 import click
 
@@ -65,7 +66,7 @@ def _run_call(
 
     from call_use.sdk import CallAgent
 
-    kwargs = dict(
+    kwargs: dict[str, Any] = dict(
         phone=phone,
         instructions=instructions,
         user_info=user_info,

@@ -1,4 +1,4 @@
-.PHONY: test lint format build check clean
+.PHONY: test lint format typecheck build check clean
 
 test:
 	pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=80
@@ -10,11 +10,14 @@ lint:
 format:
 	ruff format call_use/ tests/
 
+typecheck:
+	mypy call_use/ --ignore-missing-imports
+
 build: clean
 	python3 -m build
 	python3 -m twine check dist/*
 
-check: lint test build
+check: lint typecheck test build
 
 clean:
 	rm -rf dist/ build/ *.egg-info

@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy"]
 
 [project.scripts]
 call-use-worker = "call_use.agent:main"
@@ -67,3 +67,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

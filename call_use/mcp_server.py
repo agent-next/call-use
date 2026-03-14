@@ -114,7 +114,7 @@ async def _do_result(task_id: str) -> dict:
         metadata = json.loads(room.metadata) if room.metadata else {}
 
         if metadata.get("state") == "ended" and "outcome" in metadata:
-            return metadata["outcome"]
+            return dict(metadata["outcome"])
 
         return {
             "task_id": task_id,
