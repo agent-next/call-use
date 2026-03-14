@@ -200,10 +200,11 @@ class TestTakeoverCancelsApproval:
 
 class TestApprovalIdUniqueness:
     def test_approval_ids_are_unique(self):
+        import uuid
+
         ids = set()
         for i in range(20):
-            _LiveKitCallAgent._approval_counter += 1
-            aid = f"apr-{int(time.time())}-{_LiveKitCallAgent._approval_counter}"
+            aid = f"apr-{uuid.uuid4().hex[:12]}"
             ids.add(aid)
         assert len(ids) == 20
 

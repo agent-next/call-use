@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import time
+import uuid
 
 from dotenv import load_dotenv
 from livekit import api, rtc
@@ -139,7 +140,6 @@ class _LiveKitCallAgent(Agent):
         Takeover bypasses _cmd_lock by calling interrupt() first.
     """
 
-    _approval_counter: int = 0
 
     def __init__(
         self,
@@ -376,8 +376,7 @@ class _LiveKitCallAgent(Agent):
         Args:
             details: What the AI wants to accept/commit (e.g., "Refund of $380, 5-7 days")
         """
-        _LiveKitCallAgent._approval_counter += 1
-        approval_id = f"apr-{int(time.time())}-{_LiveKitCallAgent._approval_counter}"
+        approval_id = f"apr-{uuid.uuid4().hex[:12]}"
 
         async with self._cmd_lock:
             self._approval_event = asyncio.Event()

@@ -17,7 +17,7 @@ print(outcome.disposition)  # "completed"
 ## What it does
 
 - **Dials outbound** via Twilio SIP trunk through LiveKit
-- **Talks** using OpenAI Whisper STT + GPT-4o + GPT-4o-mini TTS
+- **Talks** using Deepgram STT + GPT-4o + GPT-4o-mini TTS
 - **Reports** structured `CallOutcome` with transcript, events, and disposition
 - **Human takeover** — pause the agent mid-call and take over the conversation
 - **Approval flow** — agent asks for user approval before taking sensitive actions
@@ -66,7 +66,8 @@ Two processes:
 - Python 3.11+
 - [LiveKit Cloud](https://livekit.io) or self-hosted LiveKit server
 - Twilio SIP trunk connected to LiveKit
-- OpenAI API key (for STT + LLM + TTS)
+- Deepgram API key (for STT)
+- OpenAI API key (for LLM + TTS)
 
 ### Install
 
@@ -89,7 +90,8 @@ Required environment variables:
 | `LIVEKIT_API_KEY` | LiveKit API key |
 | `LIVEKIT_API_SECRET` | LiveKit API secret |
 | `SIP_TRUNK_ID` | Twilio SIP trunk ID in LiveKit |
-| `OPENAI_API_KEY` | OpenAI API key (STT + LLM + TTS) |
+| `DEEPGRAM_API_KEY` | Deepgram API key (STT) |
+| `OPENAI_API_KEY` | OpenAI API key (LLM + TTS) |
 
 ### Run the worker
 
