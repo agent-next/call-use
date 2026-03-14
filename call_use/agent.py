@@ -126,6 +126,7 @@ _HANG_UP_REASONS: dict[str, DispositionEnum] = {
 # _LiveKitCallAgent
 # ---------------------------------------------------------------------------
 
+
 class _LiveKitCallAgent(Agent):
     """Internal agent with state machine, command routing, and approval flow.
 
@@ -140,7 +141,6 @@ class _LiveKitCallAgent(Agent):
         Takeover bypasses _cmd_lock by calling interrupt() first.
     """
 
-
     def __init__(
         self,
         task: CallTask,
@@ -148,10 +148,12 @@ class _LiveKitCallAgent(Agent):
     ):
         tools = [send_dtmf_events]
         if task.approval_required:
-            tools.append(function_tool(
-                self._request_user_approval_impl,
-                name="request_user_approval",
-            ))
+            tools.append(
+                function_tool(
+                    self._request_user_approval_impl,
+                    name="request_user_approval",
+                )
+            )
         instructions = _build_instructions(task)
         super().__init__(instructions=instructions, tools=tools)
 
@@ -222,8 +224,7 @@ class _LiveKitCallAgent(Agent):
             task = asyncio.create_task(self._on_data_received(dp))
             task.add_done_callback(
                 lambda t: (
-                    t.exception()
-                    and logger.error("data handler error", exc_info=t.exception())
+                    t.exception() and logger.error("data handler error", exc_info=t.exception())
                 )
             )
 
@@ -237,13 +238,13 @@ class _LiveKitCallAgent(Agent):
     # ---- Transcript hooks (Step 5c) ----
 
     async def on_user_turn_completed(
-        self, chat_ctx, new_message,
+        self,
+        chat_ctx,
+        new_message,
     ):
         """Called by LiveKit when user (callee) speech is committed to history."""
         text = (
-            new_message.text_content
-            if hasattr(new_message, "text_content")
-            else str(new_message)
+            new_message.text_content if hasattr(new_message, "text_content") else str(new_message)
         )
         if text and self._evidence:
             await self._evidence.emit_transcript("callee", text)
@@ -295,15 +296,10 @@ class _LiveKitCallAgent(Agent):
         if self._current_state == CallStateEnum.human_takeover:
             await self._update_metadata("human_takeover")
             return
-        if self._current_state not in (
-            CallStateEnum.connected, CallStateEnum.awaiting_approval
-        ):
+        if self._current_state not in (CallStateEnum.connected, CallStateEnum.awaiting_approval):
             logger.warning(f"Ignoring takeover in state '{self._current_state.value}'")
             return
-        if (
-            self._current_state == CallStateEnum.awaiting_approval
-            and self._approval_event
-        ):
+        if self._current_state == CallStateEnum.awaiting_approval and self._approval_event:
             self._approval_result = "cancelled"
             self._approval_event.set()
         self.session.output.set_audio_enabled(False)
@@ -315,9 +311,7 @@ class _LiveKitCallAgent(Agent):
 
     async def _handle_resume(self, payload):
         if self._current_state != CallStateEnum.human_takeover:
-            logger.warning(
-                f"Ignoring resume in state '{self._current_state.value}'"
-            )
+            logger.warning(f"Ignoring resume in state '{self._current_state.value}'")
             return None
         summary = payload.get("summary", "")
         await self._set_state(CallStateEnum.connected)
@@ -346,13 +340,8 @@ class _LiveKitCallAgent(Agent):
         )
 
     async def _handle_approval_response(self, payload):
-        if (
-            self._current_state != CallStateEnum.awaiting_approval
-            or not self._approval_event
-        ):
-            logger.warning(
-                f"Ignoring approval response in state '{self._current_state.value}'"
-            )
+        if self._current_state != CallStateEnum.awaiting_approval or not self._approval_event:
+            logger.warning(f"Ignoring approval response in state '{self._current_state.value}'")
             return
         resp_id = payload.get("approval_id", "")
         if resp_id != self._approval_id:
@@ -395,9 +384,7 @@ class _LiveKitCallAgent(Agent):
                 agent_identity = ""
                 if self._room:
                     agent_identity = self._room.local_participant.identity
-                await self._evidence.emit_approval_request(
-                    approval_id, details, agent_identity
-                )
+                await self._evidence.emit_approval_request(approval_id, details, agent_identity)
 
             if self._room and self._current_state == CallStateEnum.awaiting_approval:
                 approval_event = CallEvent(
@@ -411,9 +398,7 @@ class _LiveKitCallAgent(Agent):
                 )
 
             try:
-                await asyncio.wait_for(
-                    self._approval_event.wait(), timeout=self.APPROVAL_TIMEOUT
-                )
+                await asyncio.wait_for(self._approval_event.wait(), timeout=self.APPROVAL_TIMEOUT)
             except asyncio.TimeoutError:
                 self._approval_result = "rejected"
                 logger.info("Approval timed out -- auto-rejecting")
@@ -466,13 +451,16 @@ class _LiveKitCallAgent(Agent):
         # Write outcome to room metadata for SDK/server to read
         if self._lk_api and self._room and outcome:
             try:
-                meta = json.dumps({
-                    "state": "ended",
-                    "disposition": disposition.value,
-                    "outcome": outcome.model_dump(mode="json"),
-                })
+                meta = json.dumps(
+                    {
+                        "state": "ended",
+                        "disposition": disposition.value,
+                        "outcome": outcome.model_dump(mode="json"),
+                    }
+                )
                 req = api.UpdateRoomMetadataRequest(
-                    room=self._room.name, metadata=meta,
+                    room=self._room.name,
+                    metadata=meta,
                 )
                 await self._lk_api.room.update_room_metadata(req)
             except Exception:
@@ -483,7 +471,9 @@ class _LiveKitCallAgent(Agent):
             try:
                 complete_event = CallEvent(
                     type=CallEventType.call_complete,
-                    data=outcome.model_dump(mode="json") if outcome else {
+                    data=outcome.model_dump(mode="json")
+                    if outcome
+                    else {
                         "task_id": self._task.task_id,
                         "transcript": [],
                         "events": [],
@@ -532,6 +522,7 @@ class _LiveKitCallAgent(Agent):
 
         # Wire evidence events to call-events data channel
         if self._evidence:
+
             async def _publish_event(event: CallEvent):
                 try:
                     await ctx.room.local_participant.publish_data(
@@ -541,6 +532,7 @@ class _LiveKitCallAgent(Agent):
                     )
                 except Exception:
                     logger.warning("Failed to publish event", exc_info=True)
+
             self._evidence.subscribe(_publish_event)
 
         # Emit initial state
@@ -594,8 +586,7 @@ class _LiveKitCallAgent(Agent):
                 audio_input=room_io.AudioInputOptions(
                     noise_cancellation=lambda params: (
                         noise_cancellation.BVCTelephony()
-                        if params.participant.kind
-                        == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
+                        if params.participant.kind == rtc.ParticipantKind.PARTICIPANT_KIND_SIP
                         else noise_cancellation.BVC()
                     ),
                 ),
@@ -609,6 +600,7 @@ class _LiveKitCallAgent(Agent):
         # "conversation_item_added" event which fires for both user and
         # assistant messages.  We filter on role == "assistant".
         if self._evidence:
+
             @session.on("conversation_item_added")
             def _on_conversation_item(ev):
                 msg = ev.item
@@ -713,7 +705,9 @@ async def entrypoint(ctx: JobContext):
 
     agent_identity = f"agent-{task.task_id[:8]}"
     evidence = EvidencePipeline(
-        task, room_name=ctx.room.name, agent_identity=agent_identity,
+        task,
+        room_name=ctx.room.name,
+        agent_identity=agent_identity,
     )
     agent = _LiveKitCallAgent(task=task, evidence=evidence)
     await agent.run(ctx)
