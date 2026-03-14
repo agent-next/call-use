@@ -1,20 +1,17 @@
 # call-use
 
-Open-source outbound call-control runtime for agent builders. Your AI agent dials a phone number, talks to a human, and reports back with a structured outcome.
+[![PyPI](https://img.shields.io/pypi/v/call-use)](https://pypi.org/project/call-use/)
+[![Tests](https://github.com/agent-next/call-use/actions/workflows/ci.yml/badge.svg)](https://github.com/agent-next/call-use/actions)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/agent-next/call-use/blob/main/LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
+
+> **Give your AI agent the ability to make phone calls.** The [browser-use](https://github.com/browser-use/browser-use) for phones.
 
 ```python
 from call_use import CallAgent
 
-agent = CallAgent(
-    phone="+18001234567",
-    instructions="Cancel my internet subscription. My account number is 12345.",
-    on_event=lambda e: print(e),
-    on_approval=lambda details: "approved",
-)
-outcome = await agent.call()
-
-print(outcome.disposition)   # "completed"
-print(outcome.transcript)    # [{"speaker": "callee", "text": "How can I help?"}, ...]
+outcome = await CallAgent(phone="+18001234567", instructions="Cancel my subscription").call()
+print(outcome.disposition)  # "completed"
 ```
 
 ## What it does
@@ -25,6 +22,23 @@ print(outcome.transcript)    # [{"speaker": "callee", "text": "How can I help?"}
 - **Human takeover** — pause the agent mid-call and take over the conversation
 - **Approval flow** — agent asks for user approval before taking sensitive actions
 - **REST API** — deploy as a service with `create_app()` for multi-tenant usage
+
+## Why call-use?
+
+| | call-use | Build from scratch | Pine AI |
+|---|:---:|:---:|:---:|
+| Make a phone call | 3 lines | months | sign up + $$$ |
+| IVR navigation | built-in | weeks | built-in |
+| Live transcript | built-in | weeks | built-in |
+| Human takeover | built-in | weeks | — |
+| Approval flow | built-in | days | — |
+| Open source | yes | — | no |
+| Self-hostable | yes | — | no |
+| Any agent framework | yes | — | no |
+
+## Works with
+
+Claude Code · LangChain · OpenAI Agents · CrewAI · Any agent that runs bash
 
 ## Architecture
 
