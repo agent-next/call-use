@@ -116,3 +116,23 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
     expected_outcomes = {"completed", "voicemail", "no_answer", "busy"}
     if disposition not in expected_outcomes:
         sys.exit(1)
+
+
+@main.command()
+@click.option("--github", is_flag=True, help="Authenticate via GitHub OAuth (free tier).")
+@click.option("--phone", "phone_number", default=None, help="Verify phone number via SMS (paid tier).")
+def auth(github, phone_number):
+    """Authenticate with call-use cloud for zero-config calling.
+
+    \b
+    Tiers:
+        --github    Free tier: 5 calls/day to 800 numbers
+        --phone     Paid tier: bind your own caller ID via SMS
+    """
+    if github:
+        click.echo("call-use cloud auth coming soon. For now, set LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET in .env", err=True)
+        sys.exit(0)
+    if phone_number:
+        click.echo("Phone verification coming soon. For now, set your caller ID via --caller-id flag.", err=True)
+        sys.exit(0)
+    click.echo("Run 'call-use auth --github' for free tier or 'call-use auth --phone +1...' for paid tier.", err=True)
