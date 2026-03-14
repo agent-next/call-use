@@ -8,6 +8,18 @@ dynamic = ["version"]
 description = "Open-source outbound call-control runtime for agent builders"
 readme = "README.md"
 license = {text = "MIT"}
+authors = [{name = "agent-next"}]
+keywords = ["ai", "agent", "phone", "call", "voice", "livekit", "browser-use", "computer-use"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Communications :: Telephony",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 requires-python = ">=3.11"
 dependencies = [
     "livekit-agents[silero,turn-detector]~=1.4",
@@ -30,6 +42,11 @@ dev = ["pytest", "pytest-asyncio", "httpx"]
 call-use-worker = "call_use.agent:main"
 call-use = "call_use.cli:main"
 call-use-mcp = "call_use.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/agent-next/call-use"
+Repository = "https://github.com/agent-next/call-use"
+Issues = "https://github.com/agent-next/call-use/issues"
 
 [tool.setuptools.dynamic]
 version = {attr = "call_use._version.__version__"}
