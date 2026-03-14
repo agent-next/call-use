@@ -24,6 +24,7 @@ __all__ = [
     "CallTask",
     "DispositionEnum",
     "create_app",
+    "mcp_server",
 ]
 
 
@@ -35,4 +36,7 @@ def __getattr__(name: str):
     if name == "create_app":
         from call_use.server import create_app
         return create_app
+    if name == "mcp_server":
+        import call_use.mcp_server
+        return call_use.mcp_server
     raise AttributeError(f"module 'call_use' has no attribute {name!r}")
