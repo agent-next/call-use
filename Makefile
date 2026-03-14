@@ -1,7 +1,7 @@
 .PHONY: test lint format build check clean
 
 test:
-	pytest tests/ -v --tb=short
+	pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=80
 
 lint:
 	ruff check call_use/ tests/

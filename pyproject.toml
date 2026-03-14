@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "httpx"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx"]
 
 [project.scripts]
 call-use-worker = "call_use.agent:main"
