@@ -51,6 +51,9 @@ Issues = "https://github.com/agent-next/call-use/issues"
 [tool.setuptools.dynamic]
 version = {attr = "call_use._version.__version__"}
 
+[tool.setuptools.packages.find]
+include = ["call_use*"]
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
