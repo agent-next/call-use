@@ -559,10 +559,10 @@ class _LiveKitCallAgent(Agent):
 
             # Map SIP status codes to dispositions
             SIP_DISPOSITION_MAP = {
-                "486": DispositionEnum.busy,       # Busy Here
-                "480": DispositionEnum.no_answer,   # Temporarily Unavailable
-                "408": DispositionEnum.no_answer,   # Request Timeout
-                "487": DispositionEnum.cancelled,   # Request Terminated
+                "486": DispositionEnum.busy,  # Busy Here
+                "480": DispositionEnum.no_answer,  # Temporarily Unavailable
+                "408": DispositionEnum.no_answer,  # Request Timeout
+                "487": DispositionEnum.cancelled,  # Request Terminated
             }
 
             disp = SIP_DISPOSITION_MAP.get(sip_status, DispositionEnum.failed)
