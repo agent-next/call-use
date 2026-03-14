@@ -581,6 +581,7 @@ class _LiveKitCallAgent(Agent):
             @session.on("agent_speech_committed")
             def _on_agent_speech(msg):
                 text = msg.text_content if hasattr(msg, "text_content") else str(msg)
+                logger.info(f"=== AGENT SPEECH: '{text[:100] if text else ''}' ===")
                 if text:
                     asyncio.create_task(self._evidence.emit_transcript("agent", text))
 
@@ -588,7 +589,14 @@ class _LiveKitCallAgent(Agent):
             def _on_tools_executed(ev):
                 for call in getattr(ev, "function_calls", []):
                     if getattr(call, "name", "") == "send_dtmf_events":
-                        keys = (call.arguments or {}).get("keys", "")
+                        args = call.arguments or {}
+                        if isinstance(args, str):
+                            import json as _json
+                            try:
+                                args = _json.loads(args)
+                            except (ValueError, TypeError):
+                                args = {"keys": args}
+                        keys = args.get("keys", "") if isinstance(args, dict) else str(args)
                         if keys:
                             asyncio.create_task(self._evidence.emit_dtmf(keys))
 
