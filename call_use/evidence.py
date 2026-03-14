@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import time
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -9,7 +10,7 @@ from call_use.models import (
 )
 
 logger = logging.getLogger(__name__)
-LOGS_DIR = Path(__file__).parent.parent / "logs"
+LOGS_DIR = Path(os.environ.get("CALL_USE_LOG_DIR", Path.home() / ".call-use" / "logs"))
 
 
 class EvidencePipeline:
