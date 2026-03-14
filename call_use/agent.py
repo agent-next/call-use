@@ -223,6 +223,7 @@ class _LiveKitCallAgent(Agent):
     ):
         """Called by LiveKit when user (callee) speech is committed to history."""
         text = new_message.text_content if hasattr(new_message, "text_content") else str(new_message)
+        logger.info(f"on_user_turn_completed: '{text[:100] if text else ''}'")
         if text and self._evidence:
             await self._evidence.emit_transcript("callee", text)
 
@@ -626,8 +627,8 @@ class _LiveKitCallAgent(Agent):
                         )
                 asyncio.create_task(self.finalize_and_publish(disp))
 
-        # Outbound calls: agent waits for callee to speak first, then responds automatically
-        # via the STT→LLM→TTS pipeline. No greeting is generated.
+        # Outbound calls: agent waits for callee to speak first.
+        # The STT→LLM→TTS pipeline handles auto-response after turn end.
 
     async def _timeout_guard(self, timeout_seconds: int):
         """Cancel the call after timeout_seconds."""
