@@ -8,10 +8,10 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-
 # ---------------------------------------------------------------------------
 # CallTask
 # ---------------------------------------------------------------------------
+
 
 def _generate_task_id() -> str:
     return f"task-{uuid4().hex[:8]}"
@@ -32,6 +32,7 @@ class CallTask(BaseModel):
 # ---------------------------------------------------------------------------
 # Enums
 # ---------------------------------------------------------------------------
+
 
 class CallStateEnum(str, Enum):
     created = "created"
@@ -84,6 +85,7 @@ class CallErrorCode(str, Enum):
 # Event / Outcome models
 # ---------------------------------------------------------------------------
 
+
 class CallEvent(BaseModel):
     timestamp: float = Field(default_factory=time.time)
     type: CallEventType
@@ -103,6 +105,7 @@ class CallOutcome(BaseModel):
 # ---------------------------------------------------------------------------
 # CallError
 # ---------------------------------------------------------------------------
+
 
 class CallError(Exception):
     def __init__(self, code: CallErrorCode, message: str) -> None:

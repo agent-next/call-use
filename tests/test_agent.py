@@ -6,8 +6,6 @@ import sys
 import time
 from unittest.mock import AsyncMock, MagicMock
 
-import pytest
-
 # Mock livekit imports so tests work without LiveKit installed.
 _livekit_mock = MagicMock()
 _livekit_agents_mock = MagicMock()
@@ -15,6 +13,7 @@ _livekit_agents_mock = MagicMock()
 
 class _FakeAgent:
     """Minimal stand-in for livekit.agents.Agent."""
+
     def __init__(self, *args, **kwargs):
         self._session = None
 
@@ -29,26 +28,35 @@ _livekit_agents_mock.Agent = _FakeAgent
 _livekit_agents_mock.function_tool = lambda fn=None, **kw: fn if fn else (lambda f: f)
 
 for mod in [
-    "livekit", "livekit.api", "livekit.rtc", "livekit.agents",
-    "livekit.agents.beta", "livekit.agents.beta.tools",
-    "livekit.plugins", "livekit.plugins.openai",
-    "livekit.plugins.deepgram", "livekit.plugins.silero",
+    "livekit",
+    "livekit.api",
+    "livekit.rtc",
+    "livekit.agents",
+    "livekit.agents.beta",
+    "livekit.agents.beta.tools",
+    "livekit.plugins",
+    "livekit.plugins.openai",
+    "livekit.plugins.deepgram",
+    "livekit.plugins.silero",
     "livekit.plugins.noise_cancellation",
-    "livekit.protocol", "livekit.protocol.sip",
+    "livekit.protocol",
+    "livekit.protocol.sip",
     "dotenv",
 ]:
     sys.modules.setdefault(mod, MagicMock() if mod != "livekit.agents" else _livekit_agents_mock)
 
 from call_use.agent import (  # noqa: E402
-    _LiveKitCallAgent, _build_instructions, _HANG_UP_REASONS,
+    _HANG_UP_REASONS,
+    _build_instructions,
+    _LiveKitCallAgent,
 )
-from call_use.models import CallTask, CallStateEnum, DispositionEnum  # noqa: E402
 from call_use.evidence import EvidencePipeline  # noqa: E402
-
+from call_use.models import CallStateEnum, CallTask, DispositionEnum  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_task(**overrides) -> CallTask:
     defaults = dict(phone_number="+12025551234", instructions="Test task")
@@ -73,6 +81,7 @@ def _make_agent(task=None, **overrides):
 # ===========================================================================
 # 1-4: Instruction building
 # ===========================================================================
+
 
 class TestBuildInstructions:
     def test_includes_task_instructions(self):
@@ -120,6 +129,7 @@ class TestBuildInstructions:
 # 5: State transitions — connected → human_takeover → connected (resume)
 # ===========================================================================
 
+
 class TestTakeoverResumeFlow:
     async def test_takeover_then_resume(self):
         agent = _make_agent()
@@ -145,6 +155,7 @@ class TestTakeoverResumeFlow:
 # 6: Approval state transitions
 # ===========================================================================
 
+
 class TestApprovalFlow:
     async def test_approval_state_transition(self):
         agent = _make_agent()
@@ -157,9 +168,7 @@ class TestApprovalFlow:
         assert agent._current_state == CallStateEnum.awaiting_approval
 
         # Approve with correct ID
-        await agent._handle_approval_response(
-            {"type": "approve", "approval_id": "apr-test-1"}
-        )
+        await agent._handle_approval_response({"type": "approve", "approval_id": "apr-test-1"})
         assert agent._approval_result == "approved"
         assert agent._approval_event.is_set()
 
@@ -167,6 +176,7 @@ class TestApprovalFlow:
 # ===========================================================================
 # 7: awaiting_approval → human_takeover (takeover cancels approval)
 # ===========================================================================
+
 
 class TestTakeoverCancelsApproval:
     async def test_takeover_during_awaiting_approval(self):
@@ -185,6 +195,7 @@ class TestTakeoverCancelsApproval:
 # 8: Approval ID generation uniqueness
 # ===========================================================================
 
+
 class TestApprovalIdUniqueness:
     def test_approval_ids_are_unique(self):
         ids = set()
@@ -199,6 +210,7 @@ class TestApprovalIdUniqueness:
 # 9-10: Approval ID correlation — wrong/empty ID rejected
 # ===========================================================================
 
+
 class TestApprovalIdCorrelation:
     async def test_wrong_approval_id_rejected(self):
         agent = _make_agent()
@@ -207,9 +219,7 @@ class TestApprovalIdCorrelation:
         agent._approval_id = "apr-correct-1"
 
         # Wrong ID — handler should return without setting event
-        await agent._handle_approval_response(
-            {"type": "approve", "approval_id": "apr-wrong-id"}
-        )
+        await agent._handle_approval_response({"type": "approve", "approval_id": "apr-wrong-id"})
         assert not agent._approval_event.is_set()
         assert agent._approval_result is None
 
@@ -219,9 +229,7 @@ class TestApprovalIdCorrelation:
         agent._approval_event = asyncio.Event()
         agent._approval_id = "apr-correct-2"
 
-        await agent._handle_approval_response(
-            {"type": "approve", "approval_id": ""}
-        )
+        await agent._handle_approval_response({"type": "approve", "approval_id": ""})
         assert not agent._approval_event.is_set()
         assert agent._approval_result is None
 
@@ -229,6 +237,7 @@ class TestApprovalIdCorrelation:
 # ===========================================================================
 # 11: Takeover while active — state changes to human_takeover
 # ===========================================================================
+
 
 class TestTakeoverWhileActive:
     async def test_takeover_from_connected(self):
@@ -243,6 +252,7 @@ class TestTakeoverWhileActive:
 # ===========================================================================
 # 12: Resume while not in human_takeover — ignored with warning
 # ===========================================================================
+
 
 class TestResumeWhileNotInTakeover:
     async def test_resume_while_connected_is_ignored(self, caplog):
@@ -267,6 +277,7 @@ class TestResumeWhileNotInTakeover:
 # 13: Double takeover — idempotent
 # ===========================================================================
 
+
 class TestDoubleTakeover:
     async def test_double_takeover_is_idempotent(self):
         agent = _make_agent()
@@ -282,6 +293,7 @@ class TestDoubleTakeover:
 # ===========================================================================
 # Hang-up reasons mapping
 # ===========================================================================
+
 
 class TestHangUpReasons:
     def test_maps_to_dispositions(self):
@@ -303,6 +315,7 @@ class TestHangUpReasons:
 # ===========================================================================
 # Transcript hooks (Step 5c)
 # ===========================================================================
+
 
 class TestTranscriptHooks:
     async def test_on_user_turn_completed_emits_callee_transcript(self):
@@ -333,6 +346,7 @@ class TestTranscriptHooks:
 # ===========================================================================
 # Inject handler
 # ===========================================================================
+
 
 class TestInjectHandler:
     async def test_inject_while_connected(self):

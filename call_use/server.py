@@ -6,13 +6,13 @@ import os
 import random
 import string
 
-from fastapi import FastAPI, HTTPException, Depends, Header
+from fastapi import Depends, FastAPI, Header, HTTPException
 from livekit import api
 from livekit.api import LiveKitAPI, SendDataRequest
 from livekit.protocol.models import DataPacket
 from pydantic import BaseModel, Field
 
-from call_use.phone import validate_phone_number, validate_caller_id
+from call_use.phone import validate_caller_id, validate_phone_number
 from call_use.rate_limit import RateLimiter
 
 
@@ -94,7 +94,11 @@ def create_app(api_key: str | None = None) -> FastAPI:
     async def create_call(req: CreateCallRequest, x_api_key: str = Header()):
         # Rate limit
         if not rate_limiter.check(x_api_key):
-            raise HTTPException(429, f"Rate limit exceeded. Max {rate_limiter.max_calls} calls per {rate_limiter.window_seconds}s.")
+            raise HTTPException(
+                429,
+                f"Rate limit exceeded. Max {rate_limiter.max_calls} calls"
+                f" per {rate_limiter.window_seconds}s.",
+            )
 
         # Validate phone number
         try:
@@ -113,16 +117,18 @@ def create_app(api_key: str | None = None) -> FastAPI:
         task_id = "call-" + "".join(random.choices(string.ascii_lowercase, k=8))
         room_name = task_id
 
-        metadata = json.dumps({
-            "phone_number": phone_number,
-            "caller_id": caller_id,
-            "instructions": req.instructions,
-            "user_info": req.user_info,
-            "voice_id": req.voice_id,
-            "approval_required": req.approval_required,
-            "timeout_seconds": req.timeout_seconds,
-            "recording_disclaimer": req.recording_disclaimer,
-        })
+        metadata = json.dumps(
+            {
+                "phone_number": phone_number,
+                "caller_id": caller_id,
+                "instructions": req.instructions,
+                "user_info": req.user_info,
+                "voice_id": req.voice_id,
+                "approval_required": req.approval_required,
+                "timeout_seconds": req.timeout_seconds,
+                "recording_disclaimer": req.recording_disclaimer,
+            }
+        )
 
         async with LiveKitAPI() as lkapi:
             await lkapi.agent_dispatch.create_dispatch(
@@ -141,13 +147,15 @@ def create_app(api_key: str | None = None) -> FastAPI:
             os.environ.get("LIVEKIT_API_SECRET", ""),
         )
         monitor_token.with_identity(f"monitor-{task_id}")
-        monitor_token.with_grants(api.VideoGrants(
-            room_join=True,
-            room=room_name,
-            can_subscribe=True,
-            can_publish=False,
-            can_publish_data=False,
-        ))
+        monitor_token.with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=room_name,
+                can_subscribe=True,
+                can_publish=False,
+                can_publish_data=False,
+            )
+        )
 
         return CreateCallResponse(
             task_id=task_id,
@@ -225,13 +233,15 @@ def create_app(api_key: str | None = None) -> FastAPI:
                 os.environ.get("LIVEKIT_API_SECRET", ""),
             )
             takeover_token.with_identity("supervisor")
-            takeover_token.with_grants(api.VideoGrants(
-                room_join=True,
-                room=room_name,
-                can_subscribe=True,
-                can_publish=True,
-                can_publish_data=False,
-            ))
+            takeover_token.with_grants(
+                api.VideoGrants(
+                    room_join=True,
+                    room=room_name,
+                    can_subscribe=True,
+                    can_publish=True,
+                    can_publish_data=False,
+                )
+            )
 
         return {"status": "takeover_active", "takeover_token": takeover_token.to_jwt()}
 
@@ -297,7 +307,9 @@ def create_app(api_key: str | None = None) -> FastAPI:
             await lkapi.room.send_data(
                 SendDataRequest(
                     room=room_name,
-                    data=json.dumps({"type": "approve", "approval_id": approval_id}).encode("utf-8"),
+                    data=json.dumps({"type": "approve", "approval_id": approval_id}).encode(
+                        "utf-8"
+                    ),
                     kind=DataPacket.Kind.RELIABLE,
                     topic="backend-commands",
                     destination_identities=[agent_id],

@@ -1,14 +1,24 @@
 """Tests for call-use MCP server tools."""
 
 import json
+import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
 from call_use.mcp_server import _do_dial, _do_result, _do_status
 
+_FULL_ENV = {
+    "LIVEKIT_URL": "wss://test",
+    "LIVEKIT_API_KEY": "key",
+    "LIVEKIT_API_SECRET": "secret",
+    "SIP_TRUNK_ID": "trunk",
+    "OPENAI_API_KEY": "sk-test",
+}
+
 
 @pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_do_dial_returns_task_id(MockLiveKitAPI):
     """dial dispatches agent and returns task_id immediately."""
@@ -26,6 +36,7 @@ async def test_do_dial_returns_task_id(MockLiveKitAPI):
 
 
 @pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
 @patch("call_use.mcp_server.CreateAgentDispatchRequest")
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_do_dial_with_user_info(MockLiveKitAPI, MockDispatchReq):
@@ -98,16 +109,18 @@ async def test_do_result_returns_outcome(MockLiveKitAPI):
     """result returns CallOutcome when call has ended."""
     mock_api = AsyncMock()
     mock_room = MagicMock()
-    mock_room.metadata = json.dumps({
-        "state": "ended",
-        "outcome": {
-            "task_id": "call-test-123",
-            "disposition": "completed",
-            "duration_seconds": 30.0,
-            "transcript": [{"speaker": "agent", "text": "Hello"}],
-            "events": [],
-        },
-    })
+    mock_room.metadata = json.dumps(
+        {
+            "state": "ended",
+            "outcome": {
+                "task_id": "call-test-123",
+                "disposition": "completed",
+                "duration_seconds": 30.0,
+                "transcript": [{"speaker": "agent", "text": "Hello"}],
+                "events": [],
+            },
+        }
+    )
     mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
@@ -134,12 +147,14 @@ async def test_do_result_in_progress(MockLiveKitAPI):
 
 
 @pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_do_dial_livekit_connection_error(MockLiveKitAPI):
     """dial returns error JSON when LiveKit is unreachable."""
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(side_effect=ConnectionError("refused"))
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
     from call_use.mcp_server import dial
+
     result_str = await dial(phone="+18005551234", instructions="test")
     result = json.loads(result_str)
     assert "error" in result
@@ -154,7 +169,19 @@ async def test_cancel_sends_command(MockLiveKitAPI):
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
     from call_use.mcp_server import cancel
+
     result_str = await cancel(task_id="call-test-cancel")
     result = json.loads(result_str)
     assert result["status"] == "cancel_requested"
     mock_api.room.send_data.assert_called_once()
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, {}, clear=True)
+async def test_do_dial_missing_env_returns_error():
+    """_do_dial returns error dict when env vars are missing."""
+    result = await _do_dial(phone="+18005551234", instructions="test")
+    assert "error" in result
+    assert "Missing required environment variables" in result["error"]
+    assert any("LIVEKIT_URL" in m for m in result["missing"])
+    assert result["help"] == "https://github.com/agent-next/call-use#configure"

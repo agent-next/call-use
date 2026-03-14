@@ -7,12 +7,16 @@ import pytest
 
 # Mock livekit before import
 for mod in [
-    "livekit", "livekit.api", "livekit.rtc", "livekit.protocol",
-    "livekit.protocol.models", "dotenv",
+    "livekit",
+    "livekit.api",
+    "livekit.rtc",
+    "livekit.protocol",
+    "livekit.protocol.models",
+    "dotenv",
 ]:
     sys.modules.setdefault(mod, MagicMock())
 
-from call_use.sdk import CallAgent
+from call_use.sdk import CallAgent  # noqa: E402
 
 
 class TestCallAgentConstructor:
@@ -67,7 +71,6 @@ class TestCallAgentConstructor:
         )
         assert agent._user_info == {}
 
-
     def test_empty_instructions_accepted(self):
         """Empty instructions are technically valid (agent uses defaults)."""
         agent = CallAgent(phone="+18002234567", instructions="", approval_required=False)
@@ -82,7 +85,9 @@ class TestCallAgentConstructor:
     def test_user_info_with_special_characters(self):
         """User info with unicode and special chars should work."""
         agent = CallAgent(
-            phone="+18002234567", instructions="test", approval_required=False,
+            phone="+18002234567",
+            instructions="test",
+            approval_required=False,
             user_info={"name": "José García", "notes": "账号 12345"},
         )
         assert agent._user_info["name"] == "José García"

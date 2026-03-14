@@ -9,6 +9,7 @@ Architecture: Non-blocking async design.
 
 import json
 import logging
+import os
 import uuid
 
 from livekit.api import (
@@ -25,7 +26,9 @@ logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
     "call-use",
-    instructions="Give your AI agent the ability to make phone calls. The 'browser-use' for phones.",
+    instructions=(
+        "Give your AI agent the ability to make phone calls. The 'browser-use' for phones."
+    ),
 )
 
 
@@ -38,23 +41,42 @@ async def _do_dial(
     timeout: int = 600,
 ) -> dict:
     """Dispatch a call via LiveKit and return immediately with task_id."""
+    required = {
+        "LIVEKIT_URL": "LiveKit server URL (wss://...)",
+        "LIVEKIT_API_KEY": "LiveKit API key",
+        "LIVEKIT_API_SECRET": "LiveKit API secret",
+        "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
+        "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
+    }
+    missing = [f"{k} — {v}" for k, v in required.items() if not os.environ.get(k)]
+    if missing:
+        return {
+            "error": "Missing required environment variables",
+            "missing": missing,
+            "help": "https://github.com/agent-next/call-use#configure",
+        }
+
     task_id = f"call-{uuid.uuid4().hex[:12]}"
 
     async with LiveKitAPI() as lk:
-        await lk.room.create_room(CreateRoomRequest(
-            name=task_id,
-            empty_timeout=timeout + 60,
-        ))
+        await lk.room.create_room(
+            CreateRoomRequest(
+                name=task_id,
+                empty_timeout=timeout + 60,
+            )
+        )
 
-        metadata = json.dumps({
-            "phone_number": phone,
-            "instructions": instructions,
-            "user_info": user_info or {},
-            "caller_id": caller_id,
-            "voice_id": voice_id,
-            "timeout_seconds": timeout,
-            "approval_required": False,
-        })
+        metadata = json.dumps(
+            {
+                "phone_number": phone,
+                "instructions": instructions,
+                "user_info": user_info or {},
+                "caller_id": caller_id,
+                "voice_id": voice_id,
+                "timeout_seconds": timeout,
+                "approval_required": False,
+            }
+        )
         await lk.agent_dispatch.create_dispatch(
             CreateAgentDispatchRequest(
                 agent_name="call-use-agent",
@@ -133,7 +155,9 @@ async def dial(
         except json.JSONDecodeError:
             return json.dumps({"error": "user_info must be valid JSON"})
         if not isinstance(parsed_info, dict):
-            return json.dumps({"error": "user_info must be a JSON object (dict), not array or scalar"})
+            return json.dumps(
+                {"error": "user_info must be a JSON object (dict), not array or scalar"}
+            )
 
     try:
         result = await _do_dial(
@@ -172,12 +196,14 @@ async def cancel(task_id: str) -> str:
     """
     try:
         async with LiveKitAPI() as lk:
-            await lk.room.send_data(SendDataRequest(
-                room=task_id,
-                data=json.dumps({"type": "cancel"}).encode(),
-                kind=DataPacket.Kind.RELIABLE,
-                topic="backend-commands",
-            ))
+            await lk.room.send_data(
+                SendDataRequest(
+                    room=task_id,
+                    data=json.dumps({"type": "cancel"}).encode(),
+                    kind=DataPacket.Kind.RELIABLE,
+                    topic="backend-commands",
+                )
+            )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})
     except Exception as e:
         return json.dumps({"error": str(e), "task_id": task_id})

@@ -12,7 +12,11 @@ from livekit.api import LiveKitAPI, SendDataRequest
 from livekit.protocol.models import DataPacket
 
 from call_use.models import (
-    CallEvent, CallEventType, CallOutcome, CallTask, DispositionEnum,
+    CallEvent,
+    CallEventType,
+    CallOutcome,
+    CallTask,
+    DispositionEnum,
 )
 from call_use.phone import validate_caller_id, validate_phone_number
 
@@ -114,27 +118,30 @@ class CallAgent:
                 return
 
             if event.type == CallEventType.approval_request and self._on_approval:
+
                 async def _handle_approval():
                     loop = asyncio.get_running_loop()
-                    result = await loop.run_in_executor(
-                        None, self._on_approval, event.data
-                    )
+                    result = await loop.run_in_executor(None, self._on_approval, event.data)
                     await self._send_approval_response(
                         room_name,
                         event.data.get("approval_id"),
                         result,
                     )
+
                 asyncio.create_task(_handle_approval())
 
         # Join room as SDK monitor
-        sdk_token = api.AccessToken(
-            os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"]
-        )
+        sdk_token = api.AccessToken(os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"])
         sdk_token.with_identity(f"sdk-{task.task_id[:8]}")
-        sdk_token.with_grants(api.VideoGrants(
-            room_join=True, room=room_name,
-            can_subscribe=True, can_publish=False, can_publish_data=False,
-        ))
+        sdk_token.with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=room_name,
+                can_subscribe=True,
+                can_publish=False,
+                can_publish_data=False,
+            )
+        )
         await room.connect(os.environ["LIVEKIT_URL"], sdk_token.to_jwt())
 
         try:
@@ -151,9 +158,7 @@ class CallAgent:
 
             # Wait for call to complete
             try:
-                await asyncio.wait_for(
-                    call_complete.wait(), timeout=self._timeout_seconds + 30
-                )
+                await asyncio.wait_for(call_complete.wait(), timeout=self._timeout_seconds + 30)
             except asyncio.TimeoutError:
                 pass
 
@@ -189,14 +194,17 @@ class CallAgent:
     async def takeover(self) -> str:
         """Request human takeover. Returns JWT token for human to join the room."""
         await self._send_command("takeover")
-        token = api.AccessToken(
-            os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"]
-        )
+        token = api.AccessToken(os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"])
         token.with_identity(f"human-{self._room_name[:8]}")
-        token.with_grants(api.VideoGrants(
-            room_join=True, room=self._room_name,
-            can_subscribe=True, can_publish=True, can_publish_data=False,
-        ))
+        token.with_grants(
+            api.VideoGrants(
+                room_join=True,
+                room=self._room_name,
+                can_subscribe=True,
+                can_publish=True,
+                can_publish_data=False,
+            )
+        )
         return token.to_jwt()
 
     async def resume(self):
@@ -231,9 +239,12 @@ class CallAgent:
             await lkapi.room.send_data(
                 SendDataRequest(
                     room=room_name,
-                    data=json.dumps({
-                        "type": cmd_type, "approval_id": approval_id,
-                    }).encode(),
+                    data=json.dumps(
+                        {
+                            "type": cmd_type,
+                            "approval_id": approval_id,
+                        }
+                    ).encode(),
                     kind=DataPacket.Kind.RELIABLE,
                     topic="backend-commands",
                     destination_identities=[agent_id],
