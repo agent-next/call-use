@@ -105,7 +105,7 @@ class CallAgent:
             event = CallEvent(**event_data)
 
             if self._on_event:
-                loop = asyncio.get_event_loop()
+                loop = asyncio.get_running_loop()
                 loop.run_in_executor(None, self._on_event, event)
 
             if event.type == CallEventType.call_complete:
@@ -115,7 +115,7 @@ class CallAgent:
 
             if event.type == CallEventType.approval_request and self._on_approval:
                 async def _handle_approval():
-                    loop = asyncio.get_event_loop()
+                    loop = asyncio.get_running_loop()
                     result = await loop.run_in_executor(
                         None, self._on_approval, event.data
                     )
