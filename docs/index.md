@@ -50,7 +50,7 @@ Three lines of Python. That's it.
 ```python
 from call_use import CallAgent
 
-outcome = await CallAgent(phone="+18001234567", instructions="Cancel my subscription").call()
+outcome = await CallAgent(phone="+18001234567", instructions="Cancel my subscription", approval_required=False).call()
 print(outcome.disposition)  # "completed"
 ```
 
