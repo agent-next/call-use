@@ -1,11 +1,14 @@
 """call-use agent -- outbound call-control agent built on LiveKit Agents v1.4."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
 import time
 import uuid
+from typing import Any
 
 from dotenv import load_dotenv
 from livekit import api, rtc
@@ -37,6 +40,36 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 SIP_TRUNK_ID = os.environ.get("SIP_TRUNK_ID", "")
+
+# SIP status code -> disposition mapping (RFC 3261)
+SIP_DISPOSITION_MAP: dict[str, "DispositionEnum"] = {
+    "486": DispositionEnum.busy,  # Busy Here
+    "600": DispositionEnum.busy,  # Busy Everywhere
+    "480": DispositionEnum.no_answer,  # Temporarily Unavailable
+    "408": DispositionEnum.no_answer,  # Request Timeout
+    "487": DispositionEnum.cancelled,  # Request Terminated
+}
+
+
+def classify_sip_error(sip_status: str, error_msg: str) -> "DispositionEnum":
+    """Classify a SIP error into a call disposition.
+
+    First checks the SIP status code against known mappings, then falls back
+    to string matching on the error message for non-SIP errors.
+    """
+    disp = SIP_DISPOSITION_MAP.get(sip_status)
+    if disp is not None:
+        return disp
+
+    error_lower = error_msg.lower()
+    if "busy" in error_lower:
+        return DispositionEnum.busy
+    if "no answer" in error_lower or "timeout" in error_lower:
+        return DispositionEnum.no_answer
+    if "voicemail" in error_lower:
+        return DispositionEnum.voicemail
+
+    return DispositionEnum.failed
 
 
 # ---------------------------------------------------------------------------
@@ -146,7 +179,7 @@ class _LiveKitCallAgent(Agent):
         task: CallTask,
         evidence: EvidencePipeline | None = None,
     ):
-        tools = [send_dtmf_events]
+        tools: list[Any] = [send_dtmf_events]
         if task.approval_required:
             tools.append(
                 function_tool(
@@ -155,7 +188,7 @@ class _LiveKitCallAgent(Agent):
                 )
             )
         instructions = _build_instructions(task)
-        super().__init__(instructions=instructions, tools=tools)
+        super().__init__(instructions=instructions, tools=tools)  # type: ignore[arg-type]
 
         self._task = task
         self._evidence = evidence
@@ -175,8 +208,8 @@ class _LiveKitCallAgent(Agent):
         self._approval_id: str | None = None
 
         # LiveKit handles (set in run() -- Step 5b)
-        self._room = None
-        self._lk_api = None
+        self._room: Any = None
+        self._lk_api: Any = None
 
     # ---- Lifecycle hooks ----
 
@@ -510,8 +543,9 @@ class _LiveKitCallAgent(Agent):
         self._lk_api = ctx.api
         task = self._task
 
-        tts_voice = task.voice_id or "alloy"
-        session = AgentSession(
+        VALID_VOICES = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+        tts_voice = task.voice_id if task.voice_id in VALID_VOICES else "alloy"
+        session: Any = AgentSession(
             stt=deepgram.STT(model="nova-3", language="en-US"),
             llm=openai.LLM(model="gpt-4o"),
             tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
@@ -552,29 +586,11 @@ class _LiveKitCallAgent(Agent):
         try:
             await ctx.api.sip.create_sip_participant(sip_request)
         except Exception as e:
-            error_msg = str(e).lower()
             sip_status = ""
             if hasattr(e, "metadata"):
                 sip_status = getattr(e, "metadata", {}).get("sip_status_code", "")
 
-            # Map SIP status codes to dispositions
-            SIP_DISPOSITION_MAP = {
-                "486": DispositionEnum.busy,  # Busy Here
-                "480": DispositionEnum.no_answer,  # Temporarily Unavailable
-                "408": DispositionEnum.no_answer,  # Request Timeout
-                "487": DispositionEnum.cancelled,  # Request Terminated
-            }
-
-            disp = SIP_DISPOSITION_MAP.get(sip_status, DispositionEnum.failed)
-
-            # Fallback to string matching for non-SIP errors
-            if disp == DispositionEnum.failed:
-                if "busy" in error_msg:
-                    disp = DispositionEnum.busy
-                elif "no answer" in error_msg or "timeout" in error_msg:
-                    disp = DispositionEnum.no_answer
-                elif "voicemail" in error_msg:
-                    disp = DispositionEnum.voicemail
+            disp = classify_sip_error(sip_status, str(e))
 
             if self._evidence:
                 await self._evidence.emit_error("dial_failed", str(e))

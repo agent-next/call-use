@@ -22,6 +22,8 @@ from livekit.api import (
 )
 from mcp.server import FastMCP
 
+from call_use.phone import validate_caller_id, validate_phone_number
+
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
@@ -55,6 +57,16 @@ async def _do_dial(
             "missing": missing,
             "help": "https://github.com/agent-next/call-use#configure",
         }
+
+    try:
+        phone = validate_phone_number(phone)
+    except ValueError as e:
+        return {"error": f"Invalid phone number: {e}"}
+    if caller_id:
+        try:
+            caller_id = validate_caller_id(caller_id)
+        except ValueError as e:
+            return {"error": f"Invalid caller ID: {e}"}
 
     task_id = f"call-{uuid.uuid4().hex[:12]}"
 
@@ -114,7 +126,7 @@ async def _do_result(task_id: str) -> dict:
         metadata = json.loads(room.metadata) if room.metadata else {}
 
         if metadata.get("state") == "ended" and "outcome" in metadata:
-            return metadata["outcome"]
+            return dict(metadata["outcome"])
 
         return {
             "task_id": task_id,
@@ -230,5 +242,5 @@ def main():
     mcp.run(transport="stdio")
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover
     main()

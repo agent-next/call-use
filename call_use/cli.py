@@ -4,6 +4,7 @@ import asyncio
 import json
 import os
 import sys
+from typing import Any
 
 import click
 
@@ -65,7 +66,7 @@ def _run_call(
 
     from call_use.sdk import CallAgent
 
-    kwargs = dict(
+    kwargs: dict[str, Any] = dict(
         phone=phone,
         instructions=instructions,
         user_info=user_info,
@@ -155,22 +156,3 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
     expected_outcomes = {"completed", "voicemail", "no_answer", "busy"}
     if disposition not in expected_outcomes:
         sys.exit(1)
-
-
-@main.command()
-@click.option("--github", is_flag=True, help="Authenticate via GitHub OAuth (free tier).")
-@click.option(
-    "--phone", "phone_number", default=None, help="Verify phone number via SMS (paid tier)."
-)
-def auth(github, phone_number):
-    """Authenticate with call-use cloud (coming in v0.2).
-
-    \b
-    Not yet available. For v0.1, configure environment variables directly.
-    See: https://github.com/agent-next/call-use#configure
-    """
-    click.echo("call-use cloud authentication is coming in v0.2.", err=True)
-    click.echo("For now, set environment variables directly:", err=True)
-    click.echo("  LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET,", err=True)
-    click.echo("  SIP_TRUNK_ID, DEEPGRAM_API_KEY, OPENAI_API_KEY", err=True)
-    click.echo("See: https://github.com/agent-next/call-use#configure", err=True)

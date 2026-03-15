@@ -4,6 +4,8 @@
 [![Tests](https://github.com/agent-next/call-use/actions/workflows/ci.yml/badge.svg)](https://github.com/agent-next/call-use/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/agent-next/call-use/blob/main/LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
+[![Docs](https://img.shields.io/badge/docs-docs.call--use.com-blue)](https://docs.call-use.com)
+[![Website](https://img.shields.io/badge/web-call--use.com-purple)](https://call-use.com)
 
 > **Give your AI agent the ability to make phone calls.** The [browser-use](https://github.com/browser-use/browser-use) for phones.
 
@@ -249,6 +251,28 @@ cd call-use
 pip install -e ".[dev]"
 pytest
 ```
+
+## Known Limitations
+
+- **In-memory state**: The REST API server stores call state in memory. State is lost on restart. For production, consider using LiveKit room metadata for call recovery, or contribute a persistence backend.
+- **Caller ID**: v0.1 validates caller ID format only. Ownership verification (via Twilio Lookup API) is planned for v0.2.
+- **Single worker**: The agent worker is designed for single-instance deployment. Horizontal scaling requires a shared state backend.
+- **PSTN only**: Currently supports outbound PSTN calls via Twilio SIP. WebRTC-to-WebRTC calls are not yet supported.
+
+## Legal Notice
+
+call-use is a developer tool for legitimate business automation. **Users are solely responsible for complying with all applicable telecommunications laws**, including but not limited to:
+
+- **TCPA** (Telephone Consumer Protection Act) — Obtain prior express consent before automated calls
+- **FCC regulations** — AI-generated voices in calls are subject to full TCPA restrictions ([FCC 24-17](https://www.fcc.gov/document/fcc-makes-ai-generated-voices-robocalls-illegal))
+- **Do Not Call Registry** — Honor opt-out requests and scrub against the National DNC Registry
+- **Recording consent** — Comply with federal and state recording laws (13 US states require two-party consent)
+- **Caller ID** — Display accurate caller ID; spoofing for fraudulent purposes is illegal
+- **State and local laws** — Additional restrictions may apply in your jurisdiction
+
+call-use includes built-in safeguards (premium-rate number blocking, rate limiting, phone validation) but these do not guarantee legal compliance. Consult legal counsel before deploying automated calling systems.
+
+This software is provided "AS IS" under the MIT License without warranty. See [LICENSE](LICENSE) for details.
 
 ## License
 

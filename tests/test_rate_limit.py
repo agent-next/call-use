@@ -3,7 +3,11 @@
 import time
 from unittest.mock import patch
 
+import pytest
+
 from call_use.rate_limit import RateLimiter
+
+pytestmark = pytest.mark.unit
 
 
 class TestRateLimiter:
