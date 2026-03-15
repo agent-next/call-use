@@ -40,3 +40,4 @@ __pycache__/
 site/
 .coverage
 .hypothesis/
+.superpowers/
