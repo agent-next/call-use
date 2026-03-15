@@ -689,6 +689,7 @@ class TestCLIBehavior:
             msg = str(exc_info.value)
             assert "LIVEKIT_URL" in msg
             assert "LIVEKIT_API_KEY" in msg
+            assert "DEEPGRAM_API_KEY" in msg
             assert "https://github.com/agent-next/call-use#configure" in msg
 
     def test_invalid_json_user_info_exits_2(self):
@@ -821,6 +822,7 @@ class TestMCPBehavior:
             "LIVEKIT_API_SECRET": "secret",
             "SIP_TRUNK_ID": "trunk",
             "OPENAI_API_KEY": "sk-test",
+            "DEEPGRAM_API_KEY": "dg-test",
         },
     )
     @patch("call_use.mcp_server.LiveKitAPI")
