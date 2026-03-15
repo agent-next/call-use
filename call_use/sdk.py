@@ -6,6 +6,7 @@ import logging
 import os
 import time
 from collections.abc import Callable
+from datetime import timedelta
 
 from livekit import api, rtc
 from livekit.api import LiveKitAPI, SendDataRequest
@@ -133,6 +134,7 @@ class CallAgent:
         # Join room as SDK monitor
         sdk_token = api.AccessToken(os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"])
         sdk_token.with_identity(f"sdk-{task.task_id[:8]}")
+        sdk_token.with_ttl(timedelta(hours=2))
         sdk_token.with_grants(
             api.VideoGrants(
                 room_join=True,
@@ -198,6 +200,7 @@ class CallAgent:
             raise RuntimeError("Call not started; room name unavailable")
         token = api.AccessToken(os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"])
         token.with_identity(f"human-{self._room_name[:8]}")
+        token.with_ttl(timedelta(minutes=15))
         token.with_grants(
             api.VideoGrants(
                 room_join=True,

@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import secrets
+from datetime import timedelta
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from livekit import api
@@ -150,6 +151,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
             os.environ.get("LIVEKIT_API_SECRET", ""),
         )
         monitor_token.with_identity(f"monitor-{task_id}")
+        monitor_token.with_ttl(timedelta(hours=2))
         monitor_token.with_grants(
             api.VideoGrants(
                 room_join=True,
@@ -236,6 +238,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
                 os.environ.get("LIVEKIT_API_SECRET", ""),
             )
             takeover_token.with_identity("supervisor")
+            takeover_token.with_ttl(timedelta(minutes=15))
             takeover_token.with_grants(
                 api.VideoGrants(
                     room_join=True,
