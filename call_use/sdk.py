@@ -13,6 +13,8 @@ from livekit.api import LiveKitAPI, SendDataRequest
 from livekit.protocol.models import DataPacket
 
 from call_use.models import (
+    CallError,
+    CallErrorCode,
     CallEvent,
     CallEventType,
     CallOutcome,
@@ -20,6 +22,8 @@ from call_use.models import (
     DispositionEnum,
 )
 from call_use.phone import validate_caller_id, validate_phone_number
+
+WORKER_JOIN_TIMEOUT = 10  # seconds to wait for worker to join room
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +103,15 @@ class CallAgent:
         self._room_name = room_name
         room = rtc.Room()
         call_complete = asyncio.Event()
+        worker_joined = asyncio.Event()
         outcome_holder: list[CallOutcome | None] = [None]
+
+        # Register participant handler BEFORE connecting
+        @room.on("participant_connected")
+        def _on_participant(participant):
+            identity = getattr(participant, "identity", "") or ""
+            if identity.startswith("agent-"):
+                worker_joined.set()
 
         # Register data handler BEFORE connecting
         @room.on("data_received")
@@ -181,6 +193,22 @@ class CallAgent:
                         metadata=metadata,
                     )
                 )
+
+            # Wait for worker to pick up the job
+            if not worker_joined.is_set():
+                try:
+                    await asyncio.wait_for(
+                        worker_joined.wait(), timeout=WORKER_JOIN_TIMEOUT
+                    )
+                except asyncio.TimeoutError:
+                    raise CallError(
+                        code=CallErrorCode.worker_not_running,
+                        message=(
+                            "No call-use-worker picked up the job within "
+                            f"{WORKER_JOIN_TIMEOUT}s. "
+                            "Ensure the worker is running: call-use-worker start"
+                        ),
+                    )
 
             # Wait for call to complete
             try:
