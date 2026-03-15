@@ -423,6 +423,51 @@ class TestDoctor:
         assert "LiveKit connection failed" in result.output
         assert "1 failed" in result.output
 
+    @patch.dict(
+        os.environ,
+        {k: v for k, v in _ALL_DOCTOR_ENV.items() if k not in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")},
+        clear=True,
+    )
+    def test_doctor_livekit_skipped_when_creds_missing(self):
+        """Missing LiveKit credentials → connectivity check skipped, exit 1."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 1
+        assert "LiveKit connectivity skipped" in result.output
+
+
+class TestCheckLivekitConnectivity:
+    def test_success_path(self):
+        """_check_livekit_connectivity returns (True, ...) when probe succeeds."""
+        from call_use.cli import _check_livekit_connectivity
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.__aenter__ = AsyncMock(return_value=mock_lkapi)
+        mock_lkapi.__aexit__ = AsyncMock(return_value=False)
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=[])
+
+        with patch.dict("sys.modules", {"livekit": MagicMock(), "livekit.api": MagicMock()}):
+            with patch("livekit.api.LiveKitAPI", return_value=mock_lkapi):
+                ok, msg = _check_livekit_connectivity()
+        assert ok is True
+        assert "LiveKit connection OK" in msg
+
+    def test_failure_path(self):
+        """_check_livekit_connectivity returns (False, ...) when probe raises."""
+        from call_use.cli import _check_livekit_connectivity
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.__aenter__ = AsyncMock(return_value=mock_lkapi)
+        mock_lkapi.__aexit__ = AsyncMock(return_value=False)
+        mock_lkapi.room.list_rooms = AsyncMock(side_effect=Exception("Connection refused"))
+
+        with patch.dict("sys.modules", {"livekit": MagicMock(), "livekit.api": MagicMock()}):
+            with patch("livekit.api.LiveKitAPI", return_value=mock_lkapi):
+                ok, msg = _check_livekit_connectivity()
+        assert ok is False
+        assert "LiveKit connection failed" in msg
+        assert "Connection refused" in msg
+
 
 # ===========================================================================
 # _run_call (lines 62-84)
