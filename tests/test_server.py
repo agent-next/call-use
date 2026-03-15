@@ -740,3 +740,93 @@ class TestRejectEdgeCases:
         lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_approval_room]))
         resp = client.post(f"/calls/{task_id}/reject", headers=headers)
         assert resp.status_code == 409
+
+
+# ===========================================================================
+# Input validation limits (security fix coverage)
+# ===========================================================================
+
+
+class TestInputValidationLimits:
+    def test_instructions_max_length(self, client, headers):
+        """POST /calls with instructions exceeding 5000 chars returns 422."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+12025551234",
+                "instructions": "x" * 5001,
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
+    def test_invalid_voice_id_rejected(self, client, headers):
+        """POST /calls with invalid voice_id returns 422."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+12025551234",
+                "instructions": "Test",
+                "voice_id": "hacker_voice",
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
+    def test_valid_voice_id_accepted(self, client, headers):
+        """POST /calls with valid voice_id succeeds."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Test",
+                    "voice_id": "nova",
+                },
+                headers=headers,
+            )
+        assert resp.status_code == 200
+
+    def test_timeout_below_minimum_rejected(self, client, headers):
+        """POST /calls with timeout_seconds < 30 returns 422."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+12025551234",
+                "instructions": "Test",
+                "timeout_seconds": 5,
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
+    def test_timeout_above_maximum_rejected(self, client, headers):
+        """POST /calls with timeout_seconds > 3600 returns 422."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+12025551234",
+                "instructions": "Test",
+                "timeout_seconds": 7200,
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
+    def test_recording_disclaimer_max_length(self, client, headers):
+        """POST /calls with recording_disclaimer exceeding 500 chars returns 422."""
+        resp = client.post(
+            "/calls",
+            json={
+                "phone_number": "+12025551234",
+                "instructions": "Test",
+                "recording_disclaimer": "x" * 501,
+            },
+            headers=headers,
+        )
+        assert resp.status_code == 422

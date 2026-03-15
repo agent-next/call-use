@@ -1,10 +1,10 @@
 """call-use dispatch server — FastAPI endpoints for call control."""
 
 import asyncio
+import hmac
 import json
 import os
-import random
-import string
+import secrets
 
 from fastapi import Depends, FastAPI, Header, HTTPException
 from livekit import api
@@ -18,13 +18,13 @@ from call_use.rate_limit import RateLimiter
 
 class CreateCallRequest(BaseModel):
     phone_number: str
-    instructions: str = "Have a friendly conversation"
+    instructions: str = Field(default="Have a friendly conversation", max_length=5000)
     caller_id: str | None = None
     user_info: dict = Field(default_factory=dict)
-    voice_id: str | None = None
+    voice_id: str | None = Field(default=None, pattern="^(alloy|echo|fable|onyx|nova|shimmer)$")
     approval_required: bool = True
-    timeout_seconds: int = 600
-    recording_disclaimer: str | None = None
+    timeout_seconds: int = Field(default=600, ge=30, le=3600)
+    recording_disclaimer: str | None = Field(default=None, max_length=500)
 
 
 class CreateCallResponse(BaseModel):
@@ -66,7 +66,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
         return _call_locks[call_id]
 
     async def verify_api_key_dep(x_api_key: str = Header()):
-        if x_api_key != api_key:
+        if not hmac.compare_digest(x_api_key, api_key):
             raise HTTPException(401, "Invalid API key")
         return x_api_key
 
@@ -117,7 +117,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
             except ValueError as e:
                 raise HTTPException(400, str(e))
 
-        task_id = "call-" + "".join(random.choices(string.ascii_lowercase, k=8))
+        task_id = "call-" + secrets.token_hex(6)
         room_name = task_id
 
         metadata = json.dumps(
