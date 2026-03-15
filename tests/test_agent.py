@@ -324,3 +324,44 @@ class TestInjectHandler:
         agent._current_state = CallStateEnum.human_takeover
         result = await agent._handle_inject({"text": "Some info"})
         assert result is None
+
+
+class TestSIPErrorClassification:
+    """SIP error -> disposition mapping."""
+
+    def test_sip_status_486_maps_to_busy(self):
+        from call_use.agent import SIP_DISPOSITION_MAP
+        from call_use.models import DispositionEnum
+        assert SIP_DISPOSITION_MAP["486"] == DispositionEnum.busy
+
+    def test_sip_status_480_maps_to_no_answer(self):
+        from call_use.agent import SIP_DISPOSITION_MAP
+        from call_use.models import DispositionEnum
+        assert SIP_DISPOSITION_MAP["480"] == DispositionEnum.no_answer
+
+    def test_sip_status_408_maps_to_no_answer(self):
+        from call_use.agent import SIP_DISPOSITION_MAP
+        from call_use.models import DispositionEnum
+        assert SIP_DISPOSITION_MAP["408"] == DispositionEnum.no_answer
+
+    def test_sip_status_487_maps_to_cancelled(self):
+        from call_use.agent import SIP_DISPOSITION_MAP
+        from call_use.models import DispositionEnum
+        assert SIP_DISPOSITION_MAP["487"] == DispositionEnum.cancelled
+
+    def test_classify_sip_error_with_status(self):
+        from call_use.agent import classify_sip_error
+        from call_use.models import DispositionEnum
+        assert classify_sip_error("486", "busy here") == DispositionEnum.busy
+
+    def test_classify_sip_error_fallback_string_match(self):
+        from call_use.agent import classify_sip_error
+        from call_use.models import DispositionEnum
+        assert classify_sip_error("", "line is busy") == DispositionEnum.busy
+        assert classify_sip_error("", "no answer from callee") == DispositionEnum.no_answer
+        assert classify_sip_error("", "went to voicemail") == DispositionEnum.voicemail
+
+    def test_classify_sip_error_unknown(self):
+        from call_use.agent import classify_sip_error
+        from call_use.models import DispositionEnum
+        assert classify_sip_error("", "something weird") == DispositionEnum.failed

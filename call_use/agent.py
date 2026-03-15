@@ -38,6 +38,36 @@ logger = logging.getLogger(__name__)
 
 SIP_TRUNK_ID = os.environ.get("SIP_TRUNK_ID", "")
 
+# SIP status code -> disposition mapping (RFC 3261)
+SIP_DISPOSITION_MAP: dict[str, "DispositionEnum"] = {
+    "486": DispositionEnum.busy,       # Busy Here
+    "600": DispositionEnum.busy,       # Busy Everywhere
+    "480": DispositionEnum.no_answer,  # Temporarily Unavailable
+    "408": DispositionEnum.no_answer,  # Request Timeout
+    "487": DispositionEnum.cancelled,  # Request Terminated
+}
+
+
+def classify_sip_error(sip_status: str, error_msg: str) -> "DispositionEnum":
+    """Classify a SIP error into a call disposition.
+
+    First checks the SIP status code against known mappings, then falls back
+    to string matching on the error message for non-SIP errors.
+    """
+    disp = SIP_DISPOSITION_MAP.get(sip_status)
+    if disp is not None:
+        return disp
+
+    error_lower = error_msg.lower()
+    if "busy" in error_lower:
+        return DispositionEnum.busy
+    if "no answer" in error_lower or "timeout" in error_lower:
+        return DispositionEnum.no_answer
+    if "voicemail" in error_lower:
+        return DispositionEnum.voicemail
+
+    return DispositionEnum.failed
+
 
 # ---------------------------------------------------------------------------
 # Instructions template
@@ -552,29 +582,11 @@ class _LiveKitCallAgent(Agent):
         try:
             await ctx.api.sip.create_sip_participant(sip_request)
         except Exception as e:
-            error_msg = str(e).lower()
             sip_status = ""
             if hasattr(e, "metadata"):
                 sip_status = getattr(e, "metadata", {}).get("sip_status_code", "")
 
-            # Map SIP status codes to dispositions
-            SIP_DISPOSITION_MAP = {
-                "486": DispositionEnum.busy,  # Busy Here
-                "480": DispositionEnum.no_answer,  # Temporarily Unavailable
-                "408": DispositionEnum.no_answer,  # Request Timeout
-                "487": DispositionEnum.cancelled,  # Request Terminated
-            }
-
-            disp = SIP_DISPOSITION_MAP.get(sip_status, DispositionEnum.failed)
-
-            # Fallback to string matching for non-SIP errors
-            if disp == DispositionEnum.failed:
-                if "busy" in error_msg:
-                    disp = DispositionEnum.busy
-                elif "no answer" in error_msg or "timeout" in error_msg:
-                    disp = DispositionEnum.no_answer
-                elif "voicemail" in error_msg:
-                    disp = DispositionEnum.voicemail
+            disp = classify_sip_error(sip_status, str(e))
 
             if self._evidence:
                 await self._evidence.emit_error("dial_failed", str(e))
