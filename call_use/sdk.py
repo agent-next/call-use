@@ -88,10 +88,11 @@ class CallAgent:
         required_vars = ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")
         missing = [v for v in required_vars if not os.environ.get(v)]
         if missing:
-            raise RuntimeError(
+            raise CallError(
+                CallErrorCode.configuration_error,
                 f"Missing required environment variables: {', '.join(missing)}. "
                 "Set these before calling CallAgent.call(). "
-                "See https://docs.call-use.com/getting-started/configuration"
+                "See https://docs.call-use.com/getting-started/configuration",
             )
 
         self._room_name = None
