@@ -279,8 +279,8 @@ class TestRateLimiting:
 
 
 class TestInjectMissingMessage:
-    def test_inject_missing_message_returns_400(self, client, headers):
-        """POST /calls/{id}/inject without a message field returns 400."""
+    def test_inject_missing_message_returns_422(self, client, headers):
+        """POST /calls/{id}/inject without a message field returns 422."""
         # Create a call first
         mock_token_instance = MagicMock()
         mock_token_instance.to_jwt.return_value = "fake-jwt-token"
@@ -305,7 +305,59 @@ class TestInjectMissingMessage:
             json={},
             headers=headers,
         )
-        assert resp.status_code == 400
+        assert resp.status_code == 422
+
+    def test_inject_empty_message_returns_422(self, client, headers):
+        """POST /calls/{id}/inject with empty message returns 422."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            create_resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Test call",
+                },
+                headers=headers,
+            )
+
+        task_id = create_resp.json()["task_id"]
+
+        resp = client.post(
+            f"/calls/{task_id}/inject",
+            json={"message": ""},
+            headers=headers,
+        )
+        assert resp.status_code == 422
+
+    def test_inject_message_too_long_returns_422(self, client, headers):
+        """POST /calls/{id}/inject with message exceeding 2000 chars returns 422."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            create_resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Test call",
+                },
+                headers=headers,
+            )
+
+        task_id = create_resp.json()["task_id"]
+
+        resp = client.post(
+            f"/calls/{task_id}/inject",
+            json={"message": "x" * 2001},
+            headers=headers,
+        )
+        assert resp.status_code == 422
 
 
 # ===========================================================================
