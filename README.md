@@ -7,7 +7,13 @@
 [![Docs](https://img.shields.io/badge/docs-docs.call--use.com-blue)](https://docs.call-use.com)
 [![Website](https://img.shields.io/badge/web-call--use.com-purple)](https://call-use.com)
 
-> **Give your AI agent the ability to make phone calls.** The [browser-use](https://github.com/browser-use/browser-use) for phones.
+> **Give your AI agent the ability to make phone calls.**
+
+<div align="center">
+
+https://github.com/agent-next/call-use/raw/main/docs/assets/demo.mp4
+
+</div>
 
 ```python
 from call_use import CallAgent
