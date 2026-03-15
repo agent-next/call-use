@@ -22,6 +22,8 @@ from livekit.api import (
 )
 from mcp.server import FastMCP
 
+from call_use.phone import validate_caller_id, validate_phone_number
+
 logger = logging.getLogger(__name__)
 
 mcp = FastMCP(
@@ -55,6 +57,16 @@ async def _do_dial(
             "missing": missing,
             "help": "https://github.com/agent-next/call-use#configure",
         }
+
+    try:
+        phone = validate_phone_number(phone)
+    except ValueError as e:
+        return {"error": f"Invalid phone number: {e}"}
+    if caller_id:
+        try:
+            caller_id = validate_caller_id(caller_id)
+        except ValueError as e:
+            return {"error": f"Invalid caller ID: {e}"}
 
     task_id = f"call-{uuid.uuid4().hex[:12]}"
 

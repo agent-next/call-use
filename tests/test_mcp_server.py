@@ -363,3 +363,28 @@ async def test_dial_tool_success(MockLiveKitAPI):
     result = json.loads(result_str)
     assert "task_id" in result
     assert result["status"] == "dispatched"
+
+
+# ===========================================================================
+# Phone/caller_id validation in _do_dial (security fix coverage)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_do_dial_rejects_invalid_phone():
+    """_do_dial returns error for invalid phone number."""
+    result = await _do_dial(phone="not-a-phone", instructions="test")
+    assert "error" in result
+    assert "Invalid phone number" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_do_dial_rejects_invalid_caller_id():
+    """_do_dial returns error for invalid caller_id."""
+    result = await _do_dial(
+        phone="+12025551234", instructions="test", caller_id="bad-caller"
+    )
+    assert "error" in result
+    assert "Invalid caller ID" in result["error"]

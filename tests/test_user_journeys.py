@@ -417,7 +417,7 @@ class TestMCPUserExperience:
                     "OPENAI_API_KEY": "sk-test",
                 },
             ):
-                result = await _do_dial(phone="+18001234567", instructions="test")
+                result = await _do_dial(phone="+12025551234", instructions="test")
                 assert "task_id" in result
                 assert result["status"] == "dispatched"
                 assert "disposition" not in result  # NOT blocking
