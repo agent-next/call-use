@@ -88,6 +88,69 @@ class TestCallAgentConstructor:
         assert agent._user_info["name"] == "José García"
 
 
+class TestCallAgentEnvValidation:
+    async def test_call_missing_env_raises_clear_error(self):
+        """call() raises RuntimeError with actionable message when env vars are missing."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        # Ensure all three required vars are unset
+        env_overrides = {
+            "LIVEKIT_URL": "",
+            "LIVEKIT_API_KEY": "",
+            "LIVEKIT_API_SECRET": "",
+        }
+        with patch.dict(os.environ, env_overrides, clear=False):
+            # Remove keys entirely (patch.dict with empty string still sets them)
+            os.environ.pop("LIVEKIT_URL", None)
+            os.environ.pop("LIVEKIT_API_KEY", None)
+            os.environ.pop("LIVEKIT_API_SECRET", None)
+
+            with pytest.raises(RuntimeError, match="Missing required environment variables"):
+                await agent.call()
+
+    async def test_call_missing_env_lists_all_missing_vars(self):
+        """Error message lists all missing variable names."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        with patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("LIVEKIT_URL", None)
+            os.environ.pop("LIVEKIT_API_KEY", None)
+            os.environ.pop("LIVEKIT_API_SECRET", None)
+
+            with pytest.raises(RuntimeError, match="LIVEKIT_API_KEY") as exc_info:
+                await agent.call()
+            msg = str(exc_info.value)
+            assert "LIVEKIT_URL" in msg
+            assert "LIVEKIT_API_SECRET" in msg
+            assert "https://docs.call-use.com" in msg
+
+    async def test_call_missing_env_partial(self):
+        """Error lists only the missing vars, not the ones that are set."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        with patch.dict(
+            os.environ,
+            {"LIVEKIT_URL": "wss://test"},
+            clear=False,
+        ):
+            os.environ.pop("LIVEKIT_API_KEY", None)
+            os.environ.pop("LIVEKIT_API_SECRET", None)
+
+            with pytest.raises(RuntimeError, match="LIVEKIT_API_KEY") as exc_info:
+                await agent.call()
+            msg = str(exc_info.value)
+            assert "LIVEKIT_URL" not in msg
+
+
 class TestCallAgentCommands:
     async def test_send_command_raises_without_active_call(self):
         agent = CallAgent(
