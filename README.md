@@ -6,6 +6,8 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
+> **Early release (v0.1)** — Core functionality works. API may change before v1.0. [Report issues](https://github.com/agent-next/call-use/issues).
+
 **Give your AI agent the ability to make phone calls.**
 
 ```python
