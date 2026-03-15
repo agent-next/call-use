@@ -50,11 +50,11 @@ async def _do_dial(
         "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
         "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
     }
-    missing = [f"{k} — {v}" for k, v in required.items() if not os.environ.get(k)]
+    missing = [k for k in required if not os.environ.get(k)]
     if missing:
+        logger.error("Missing required env vars: %s", missing)
         return {
-            "error": "Missing required environment variables",
-            "missing": missing,
+            "error": "Server configuration incomplete. Required environment variables are not set.",
             "help": "https://github.com/agent-next/call-use#configure",
         }
 
@@ -182,7 +182,8 @@ async def dial(
         )
         return json.dumps(result, indent=2)
     except Exception as e:
-        return json.dumps({"error": str(e)})
+        logger.error("dial tool error: %s", e, exc_info=True)
+        return json.dumps({"error": "Internal error. Check server logs for details."})
 
 
 @mcp.tool()
@@ -196,7 +197,8 @@ async def status(task_id: str) -> str:
         result = await _do_status(task_id)
         return json.dumps(result, indent=2)
     except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+        logger.error("status tool error: %s", e, exc_info=True)
+        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
 @mcp.tool()
@@ -218,7 +220,8 @@ async def cancel(task_id: str) -> str:
             )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})
     except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+        logger.error("cancel tool error: %s", e, exc_info=True)
+        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
 @mcp.tool()
@@ -234,7 +237,8 @@ async def result(task_id: str) -> str:
         outcome = await _do_result(task_id)
         return json.dumps(outcome, indent=2)
     except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+        logger.error("result tool error: %s", e, exc_info=True)
+        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
 def main():

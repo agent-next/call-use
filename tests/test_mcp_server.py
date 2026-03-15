@@ -184,8 +184,8 @@ async def test_do_dial_missing_env_returns_error():
     """_do_dial returns error dict when env vars are missing."""
     result = await _do_dial(phone="+18005551234", instructions="test")
     assert "error" in result
-    assert "Missing required environment variables" in result["error"]
-    assert any("LIVEKIT_URL" in m for m in result["missing"])
+    assert "Server configuration incomplete" in result["error"]
+    assert "missing" not in result
     assert result["help"] == "https://github.com/agent-next/call-use#configure"
 
 
@@ -215,14 +215,14 @@ async def test_status_tool_wraps_exception(MockLiveKitAPI):
 
     result_str = await status(task_id="call-fail")
     result = json.loads(result_str)
-    assert "error" in result
+    assert result["error"] == "Internal error. Check server logs for details."
     assert result["task_id"] == "call-fail"
 
 
 @pytest.mark.asyncio
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_result_tool_wraps_exception(MockLiveKitAPI):
-    """result tool returns error JSON on exception."""
+    """result tool returns generic error JSON on exception."""
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(side_effect=Exception("boom"))
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
@@ -230,14 +230,14 @@ async def test_result_tool_wraps_exception(MockLiveKitAPI):
 
     result_str = await result(task_id="call-fail")
     parsed = json.loads(result_str)
-    assert "error" in parsed
+    assert parsed["error"] == "Internal error. Check server logs for details."
     assert parsed["task_id"] == "call-fail"
 
 
 @pytest.mark.asyncio
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_cancel_tool_wraps_exception(MockLiveKitAPI):
-    """cancel tool returns error JSON on exception."""
+    """cancel tool returns generic error JSON on exception."""
     mock_api = AsyncMock()
     mock_api.room.send_data = AsyncMock(side_effect=Exception("room gone"))
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
@@ -247,7 +247,7 @@ async def test_cancel_tool_wraps_exception(MockLiveKitAPI):
 
     result_str = await cancel(task_id="call-fail")
     parsed = json.loads(result_str)
-    assert "error" in parsed
+    assert parsed["error"] == "Internal error. Check server logs for details."
 
 
 @pytest.mark.asyncio
