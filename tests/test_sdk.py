@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from call_use.models import CallError
 from call_use.sdk import CallAgent
 
 pytestmark = pytest.mark.unit
@@ -90,7 +91,7 @@ class TestCallAgentConstructor:
 
 class TestCallAgentEnvValidation:
     async def test_call_missing_env_raises_clear_error(self):
-        """call() raises RuntimeError with actionable message when env vars are missing."""
+        """call() raises CallError with actionable message when env vars are missing."""
         agent = CallAgent(
             phone="+12025551234",
             instructions="Test",
@@ -108,7 +109,7 @@ class TestCallAgentEnvValidation:
             os.environ.pop("LIVEKIT_API_KEY", None)
             os.environ.pop("LIVEKIT_API_SECRET", None)
 
-            with pytest.raises(RuntimeError, match="Missing required environment variables"):
+            with pytest.raises(CallError, match="Missing required environment variables"):
                 await agent.call()
 
     async def test_call_missing_env_lists_all_missing_vars(self):
@@ -123,7 +124,7 @@ class TestCallAgentEnvValidation:
             os.environ.pop("LIVEKIT_API_KEY", None)
             os.environ.pop("LIVEKIT_API_SECRET", None)
 
-            with pytest.raises(RuntimeError, match="LIVEKIT_API_KEY") as exc_info:
+            with pytest.raises(CallError, match="LIVEKIT_API_KEY") as exc_info:
                 await agent.call()
             msg = str(exc_info.value)
             assert "LIVEKIT_URL" in msg
@@ -145,7 +146,7 @@ class TestCallAgentEnvValidation:
             os.environ.pop("LIVEKIT_API_KEY", None)
             os.environ.pop("LIVEKIT_API_SECRET", None)
 
-            with pytest.raises(RuntimeError, match="LIVEKIT_API_KEY") as exc_info:
+            with pytest.raises(CallError, match="LIVEKIT_API_KEY") as exc_info:
                 await agent.call()
             msg = str(exc_info.value)
             assert "LIVEKIT_URL" not in msg

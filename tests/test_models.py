@@ -121,9 +121,10 @@ class TestEnums:
             "provider_error",
             "rate_limited",
             "cancelled",
+            "configuration_error",
         }
         assert {e.value for e in CallErrorCode} == expected
-        assert len(CallErrorCode) == 9
+        assert len(CallErrorCode) == 10
 
 
 # ---------------------------------------------------------------------------

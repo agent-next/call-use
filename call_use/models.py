@@ -79,6 +79,7 @@ class CallErrorCode(str, Enum):
     provider_error = "provider_error"
     rate_limited = "rate_limited"
     cancelled = "cancelled"
+    configuration_error = "configuration_error"
 
 
 # ---------------------------------------------------------------------------
