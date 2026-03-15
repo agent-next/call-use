@@ -1,6 +1,6 @@
 site_name: call-use
 site_description: Open-source outbound call-control runtime for AI agents
-site_url: https://agent-next.github.io/call-use/
+site_url: https://docs.call-use.com/
 repo_url: https://github.com/agent-next/call-use
 repo_name: agent-next/call-use
 edit_uri: edit/main/docs/
@@ -101,6 +101,9 @@ nav:
   - Architecture: architecture/index.md
   - Contributing: contributing.md
   - Changelog: changelog.md
+
+extra_css:
+  - stylesheets/extra.css
 
 extra:
   social:
