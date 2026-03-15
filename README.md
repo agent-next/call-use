@@ -2,106 +2,79 @@
 
 [![PyPI](https://img.shields.io/pypi/v/call-use)](https://pypi.org/project/call-use/)
 [![Tests](https://github.com/agent-next/call-use/actions/workflows/ci.yml/badge.svg)](https://github.com/agent-next/call-use/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/agent-next/call-use/blob/main/LICENSE)
+[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/agent-next/call-use/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
-[![Docs](https://img.shields.io/badge/docs-docs.call--use.com-blue)](https://docs.call-use.com)
-[![Website](https://img.shields.io/badge/web-call--use.com-purple)](https://call-use.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Give your AI agent the ability to make phone calls.** The [browser-use](https://github.com/browser-use/browser-use) for phones.
+**Give your AI agent the ability to make phone calls.**
 
 ```python
 from call_use import CallAgent
 
-outcome = await CallAgent(phone="+18001234567", instructions="Cancel my subscription").call()
-print(outcome.disposition)  # "completed"
+outcome = await CallAgent(
+    phone="+18001234567",
+    instructions="Cancel my internet subscription",
+).call()
+
+print(outcome.disposition)   # "completed"
+print(outcome.transcript)    # [{speaker: "agent", text: "..."}, ...]
 ```
 
-## What it does
+Open-source. Self-hostable. Works with any agent framework.
 
-- **Dials outbound** via Twilio SIP trunk through LiveKit
-- **Talks** using Deepgram STT + GPT-4o + GPT-4o-mini TTS
-- **Reports** structured `CallOutcome` with transcript, events, and disposition
-- **Human takeover** — pause the agent mid-call and take over the conversation
-- **Approval flow** — agent asks for user approval before taking sensitive actions
-- **REST API** — deploy as a service with `create_app()` for multi-tenant usage
+---
 
-## Why call-use?
+## Features
 
-| | call-use | Build from scratch | Pine AI |
-|---|:---:|:---:|:---:|
-| Make a phone call | 3 lines | months | sign up + $$$ |
-| IVR navigation | built-in | weeks | built-in |
-| Live transcript | built-in | weeks | built-in |
-| Human takeover | built-in | weeks | — |
-| Approval flow | built-in | days | — |
-| Open source | yes | — | no |
-| Self-hostable | yes | — | no |
-| Any agent framework | yes | — | no |
+**4 interfaces** — use whichever fits your stack:
 
-## Works with
+```bash
+# Python SDK
+outcome = await CallAgent(phone="+18001234567", instructions="...").call()
 
-Claude Code · LangChain · OpenAI Agents · CrewAI · Any agent that runs bash
+# CLI — any agent that runs bash can make calls
+call-use dial "+18001234567" -i "Ask about store hours"
 
-## Architecture
+# MCP Server — native Claude Code / Codex integration
+call-use-mcp  # stdio transport, 4 async tools
 
-```
-┌──────────────┐         ┌──────────────┐         ┌──────────────┐
-│  Your code   │────────▶│  LiveKit      │────────▶│  Twilio SIP  │
-│  (CallAgent) │  room   │  Cloud/OSS    │  trunk  │  → PSTN      │
-└──────────────┘         └──────────────┘         └──────────────┘
-                               │
-                         ┌─────┴──────┐
-                         │ call-use   │
-                         │ worker     │
-                         │ (Agent)    │
-                         └────────────┘
+# REST API — multi-tenant deployments
+curl -X POST localhost:8000/calls -H "X-API-Key: ..." -d '{"phone_number": "+18001234567"}'
 ```
 
-Two processes:
-1. **Your code** (or the REST API) creates a LiveKit room and dispatches an agent
-2. **call-use worker** joins the room, dials via SIP, runs the conversation, and publishes the outcome
+**Built-in capabilities:**
+
+| | |
+|---|---|
+| **IVR navigation** | Navigate phone menus, press buttons, handle hold music |
+| **Human takeover** | Pause the agent mid-call, join as a human, hand back |
+| **Approval flow** | Agent asks for permission before sensitive actions |
+| **Structured outcomes** | Transcript, events, disposition, duration — all typed |
+| **Phone validation** | Premium-rate blocking, Caribbean NPA blocking, E.164 |
+| **Rate limiting** | Per-key sliding window for REST API |
 
 ## Quick start
-
-### Prerequisites
-
-- Python 3.11+
-- [LiveKit Cloud](https://livekit.io) or self-hosted LiveKit server
-- Twilio SIP trunk connected to LiveKit
-- Deepgram API key (for STT)
-- OpenAI API key (for LLM + TTS)
-
-### Install
 
 ```bash
 pip install call-use
 ```
 
-### Configure
+Configure environment ([full guide](https://docs.call-use.com/getting-started/configuration/)):
 
 ```bash
-cp .env.example .env
-# Fill in your keys
+export LIVEKIT_URL="wss://..."          # LiveKit Cloud or self-hosted
+export LIVEKIT_API_KEY="..."
+export LIVEKIT_API_SECRET="..."
+export SIP_TRUNK_ID="..."               # Twilio SIP trunk in LiveKit
+export DEEPGRAM_API_KEY="..."           # STT
+export OPENAI_API_KEY="..."             # LLM + TTS
 ```
 
-Required environment variables:
-
-| Variable | Description |
-|----------|-------------|
-| `LIVEKIT_URL` | LiveKit server URL (`wss://...`) |
-| `LIVEKIT_API_KEY` | LiveKit API key |
-| `LIVEKIT_API_SECRET` | LiveKit API secret |
-| `SIP_TRUNK_ID` | Twilio SIP trunk ID in LiveKit |
-| `DEEPGRAM_API_KEY` | Deepgram API key (STT) |
-| `OPENAI_API_KEY` | OpenAI API key (LLM + TTS) |
-
-### Run the worker
+Start the worker, then make a call:
 
 ```bash
 call-use-worker start
 ```
-
-### Make a call
 
 ```python
 import asyncio
@@ -114,76 +87,34 @@ async def main():
         approval_required=False,
     )
     outcome = await agent.call()
-    print(f"Done: {outcome.disposition.value}")
+    print(f"{outcome.disposition.value}: {outcome.duration_seconds:.0f}s")
+    for t in outcome.transcript:
+        print(f"  [{t['speaker']}] {t['text']}")
 
 asyncio.run(main())
 ```
 
-## SDK usage
+## Human takeover
 
-### CallAgent
+Pause the AI, join the call yourself, then hand back:
+
+```python
+token = await agent.takeover()   # returns LiveKit JWT
+# ... join room with token, talk to callee ...
+await agent.resume()             # agent takes over again
+```
+
+## Approval flow
+
+Agent pauses and asks before sensitive actions:
 
 ```python
 agent = CallAgent(
-    phone="+18001234567",           # US/Canada number (required)
-    instructions="Your task...",     # What the agent should do (required)
-    user_info={"name": "Alice"},     # Info the agent can reference
-    caller_id="+15551234567",        # Outbound caller ID
-    voice_id="alloy",                # TTS voice (alloy/echo/fable/onyx/nova/shimmer)
-    approval_required=True,          # Agent asks before sensitive actions
-    timeout_seconds=600,             # Max call duration
-    on_event=my_event_handler,       # Real-time event callback
-    on_approval=my_approval_handler, # Approval decision callback
-    recording_disclaimer="This call may be recorded.",
+    phone="+18001234567",
+    instructions="Cancel my subscription. If they offer a discount, ask me first.",
+    approval_required=True,
+    on_approval=lambda data: input(f"Approve '{data['details']}'? [y/n]: "),
 )
-```
-
-### Events
-
-The `on_event` callback receives `CallEvent` objects:
-
-| Event type | Description |
-|------------|-------------|
-| `state_change` | Call state changed (connected, human_takeover, etc.) |
-| `transcript` | New speech transcript (speaker + text) |
-| `dtmf` | DTMF tone detected |
-| `approval_request` | Agent needs user approval |
-| `call_complete` | Call finished with outcome |
-
-### Human takeover
-
-```python
-# Pause agent, get token to join as human
-token = await agent.takeover()
-# ... join LiveKit room with token, talk to callee ...
-await agent.resume()  # Hand back to agent
-```
-
-### CallOutcome
-
-```python
-outcome = await agent.call()
-outcome.task_id          # Unique call identifier
-outcome.disposition      # completed | failed | voicemail | no_answer | busy | timeout | cancelled
-outcome.duration_seconds # Call duration
-outcome.transcript       # List of {speaker, text} dicts
-outcome.events           # List of CallEvent dicts
-```
-
-## CLI
-
-Any agent that can run bash can make phone calls:
-
-```bash
-pip install call-use
-call-use dial "+18001234567" -i "Ask about store hours"
-```
-
-Events stream to stderr, structured JSON result goes to stdout:
-
-```bash
-call-use dial "+18001234567" -i "Cancel subscription" -u '{"account": "12345"}'
-# stdout: {"task_id": "...", "disposition": "completed", "transcript": [...]}
 ```
 
 ## MCP Server
@@ -207,72 +138,80 @@ Native tool integration for Claude Code, Codex, and other MCP-compatible agents:
 }
 ```
 
-4 async tools: `dial` (non-blocking, returns task_id), `status`, `cancel`, `result`.
+4 async tools: `dial` (returns immediately), `status`, `cancel`, `result`.
 
 ## REST API
 
-For multi-tenant or server deployments:
-
 ```python
 from call_use import create_app
-
 app = create_app(api_key="your-secret-key")
-# Run with: uvicorn your_module:app
+# uvicorn your_module:app
 ```
-
-### Endpoints
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/calls` | Create a new outbound call |
-| `GET` | `/calls/{id}` | Get call status and room state |
-| `POST` | `/calls/{id}/inject` | Inject a message into the call |
-| `POST` | `/calls/{id}/takeover` | Human takeover |
-| `POST` | `/calls/{id}/resume` | Resume agent after takeover |
-| `POST` | `/calls/{id}/approve` | Approve pending action |
-| `POST` | `/calls/{id}/reject` | Reject pending action |
-| `POST` | `/calls/{id}/cancel` | Cancel the call |
+| POST | `/calls` | Create outbound call |
+| GET | `/calls/{id}` | Get status |
+| POST | `/calls/{id}/inject` | Inject message into call |
+| POST | `/calls/{id}/takeover` | Human takeover |
+| POST | `/calls/{id}/resume` | Resume agent |
+| POST | `/calls/{id}/approve` | Approve pending action |
+| POST | `/calls/{id}/reject` | Reject pending action |
+| POST | `/calls/{id}/cancel` | Cancel call |
 
 All endpoints require `X-API-Key` header.
 
+## Architecture
+
+```
+Your code ──▶ LiveKit Cloud ──▶ Twilio SIP ──▶ PSTN
+                    │
+              call-use worker
+              (Deepgram STT + GPT-4o + OpenAI TTS)
+```
+
+Two processes: your code dispatches an agent into a LiveKit room; the worker joins, dials via SIP, runs the conversation, publishes the outcome.
+
 ## Examples
 
-- [LangChain tool](https://github.com/agent-next/call-use/blob/main/examples/langchain_tool.py) — Use call-use as a LangChain tool
-- [OpenAI Agents SDK](https://github.com/agent-next/call-use/blob/main/examples/openai_agents.py) — Integrate with OpenAI Agents
-- [Claude Code MCP setup](https://github.com/agent-next/call-use/blob/main/examples/claude_code_setup.md) — Configure call-use as an MCP server
-- [Customer service refund agent](https://github.com/agent-next/call-use/blob/main/examples/cs_refund_agent.py) — End-to-end refund automation
-- [Skill](https://github.com/agent-next/call-use/blob/main/SKILL.md) — Claude Code / agent skill for automatic phone call capability
+| Example | Description |
+|---------|-------------|
+| [Customer service refund](examples/cs_refund_agent.py) | End-to-end refund automation |
+| [Appointment scheduler](examples/appointment_scheduler.py) | Navigate IVR, book appointment |
+| [Insurance claim](examples/insurance_claim.py) | File claim, capture claim number |
+| [Subscription cancellation](examples/subscription_cancellation.py) | Handle retention offers via approval |
+| [Multi-call workflow](examples/multi_call_workflow.py) | Chain sequential calls |
+| [Webhook integration](examples/webhook_integration.py) | FastAPI + WebSocket events |
+| [LangChain tool](examples/langchain_tool.py) | Use as a LangChain tool |
+| [OpenAI Agents](examples/openai_agents.py) | OpenAI Agents SDK integration |
+| [CrewAI](examples/crewai_integration.py) | PhoneCallTool for CrewAI |
+| [Claude Code MCP](examples/claude_code_setup.md) | MCP server setup guide |
 
-## Development
+## Documentation
+
+Full docs at [docs.call-use.com](https://docs.call-use.com) — getting started, guides, API reference, architecture.
+
+## Contributing
 
 ```bash
 git clone https://github.com/agent-next/call-use.git
 cd call-use
 pip install -e ".[dev]"
-pytest
+make check  # lint + typecheck + test (100% coverage) + build
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Known Limitations
 
-- **In-memory state**: The REST API server stores call state in memory. State is lost on restart. For production, consider using LiveKit room metadata for call recovery, or contribute a persistence backend.
-- **Caller ID**: v0.1 validates caller ID format only. Ownership verification (via Twilio Lookup API) is planned for v0.2.
-- **Single worker**: The agent worker is designed for single-instance deployment. Horizontal scaling requires a shared state backend.
-- **PSTN only**: Currently supports outbound PSTN calls via Twilio SIP. WebRTC-to-WebRTC calls are not yet supported.
+- **In-memory state** — REST API call state lost on restart
+- **Caller ID** — Format validation only; ownership verification planned for v0.2
+- **Single worker** — Horizontal scaling requires shared state backend
+- **US/Canada only** — Outbound PSTN via Twilio SIP; international and inbound planned
 
 ## Legal Notice
 
-call-use is a developer tool for legitimate business automation. **Users are solely responsible for complying with all applicable telecommunications laws**, including but not limited to:
-
-- **TCPA** (Telephone Consumer Protection Act) — Obtain prior express consent before automated calls
-- **FCC regulations** — AI-generated voices in calls are subject to full TCPA restrictions ([FCC 24-17](https://www.fcc.gov/document/fcc-makes-ai-generated-voices-robocalls-illegal))
-- **Do Not Call Registry** — Honor opt-out requests and scrub against the National DNC Registry
-- **Recording consent** — Comply with federal and state recording laws (13 US states require two-party consent)
-- **Caller ID** — Display accurate caller ID; spoofing for fraudulent purposes is illegal
-- **State and local laws** — Additional restrictions may apply in your jurisdiction
-
-call-use includes built-in safeguards (premium-rate number blocking, rate limiting, phone validation) but these do not guarantee legal compliance. Consult legal counsel before deploying automated calling systems.
-
-This software is provided "AS IS" under the MIT License without warranty. See [LICENSE](LICENSE) for details.
+call-use is a developer tool for legitimate business automation. Users are solely responsible for complying with all applicable telecommunications laws including TCPA, FCC regulations on AI-generated voices ([FCC 24-17](https://www.fcc.gov/document/fcc-makes-ai-generated-voices-robocalls-illegal)), Do Not Call registry, and state recording consent laws. See [SECURITY.md](SECURITY.md) for details.
 
 ## License
 
