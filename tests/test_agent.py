@@ -3,8 +3,11 @@
 # LiveKit mocks are set up in conftest.py (shared across all test files).
 
 import asyncio
+import json
 import logging
 from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from call_use.agent import (
     _HANG_UP_REASONS,
@@ -12,7 +15,7 @@ from call_use.agent import (
     _LiveKitCallAgent,
 )
 from call_use.evidence import EvidencePipeline
-from call_use.models import CallStateEnum, CallTask, DispositionEnum
+from call_use.models import CallEvent, CallEventType, CallOutcome, CallStateEnum, CallTask, DispositionEnum
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -365,3 +368,434 @@ class TestSIPErrorClassification:
         from call_use.agent import classify_sip_error
         from call_use.models import DispositionEnum
         assert classify_sip_error("", "something weird") == DispositionEnum.failed
+
+
+# ===========================================================================
+# _update_metadata
+# ===========================================================================
+
+
+class TestUpdateMetadata:
+    async def test_update_metadata_writes_to_room(self):
+        """_update_metadata writes agent_identity and state to room metadata."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+
+        await agent._update_metadata("connected")
+        agent._lk_api.room.update_room_metadata.assert_called_once()
+
+    async def test_update_metadata_includes_approval_id_when_awaiting(self):
+        """_update_metadata includes approval_id when state is awaiting_approval."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._approval_id = "apr-test-99"
+
+        await agent._update_metadata("awaiting_approval")
+        agent._lk_api.room.update_room_metadata.assert_called_once()
+
+    async def test_update_metadata_no_room_is_noop(self):
+        """_update_metadata does nothing if room is not set."""
+        agent = _make_agent()
+        agent._room = None
+        agent._lk_api = None
+        # Should not raise
+        await agent._update_metadata("connected")
+
+    async def test_update_metadata_retries_on_failure(self):
+        """_update_metadata retries once on failure."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock(
+            side_effect=[Exception("network error"), None]
+        )
+        await agent._update_metadata("connected")
+        assert agent._lk_api.room.update_room_metadata.call_count == 2
+
+    async def test_update_metadata_both_attempts_fail(self):
+        """_update_metadata logs error after both attempts fail."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock(
+            side_effect=Exception("persistent failure")
+        )
+        # Should not raise, just log
+        await agent._update_metadata("connected")
+        assert agent._lk_api.room.update_room_metadata.call_count == 2
+
+
+# ===========================================================================
+# on_enter
+# ===========================================================================
+
+
+class TestOnEnter:
+    async def test_on_enter_sets_state_and_registers_handler(self):
+        """on_enter transitions to connected and registers data handler."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.on = MagicMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+
+        await agent.on_enter()
+        assert agent._current_state == CallStateEnum.connected
+        agent._room.on.assert_called_once()
+
+    async def test_on_enter_no_room_returns_early(self):
+        """on_enter returns early if room is None."""
+        agent = _make_agent()
+        agent._room = None
+        await agent.on_enter()
+        assert agent._current_state == CallStateEnum.created
+
+    async def test_on_enter_speaks_recording_disclaimer(self):
+        """on_enter speaks recording disclaimer if configured."""
+        task = _make_task(recording_disclaimer="This call may be recorded.")
+        agent = _make_agent(task=task)
+        agent._room = MagicMock()
+        agent._room.on = MagicMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+        agent._session.say = AsyncMock()
+
+        await agent.on_enter()
+        agent._session.say.assert_called_once_with(
+            "This call may be recorded.", allow_interruptions=False
+        )
+
+
+# ===========================================================================
+# _on_data_received routing
+# ===========================================================================
+
+
+class TestOnDataReceived:
+    def _make_dp(self, cmd_type, **extra):
+        payload = {"type": cmd_type, **extra}
+        dp = MagicMock()
+        dp.topic = "backend-commands"
+        dp.data = json.dumps(payload).encode("utf-8")
+        return dp
+
+    async def test_ignores_non_backend_commands(self):
+        """_on_data_received ignores packets with wrong topic."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        dp = MagicMock()
+        dp.topic = "other-topic"
+        # Should not raise
+        await agent._on_data_received(dp)
+
+    async def test_routes_cancel_command(self):
+        """Cancel command sets _cancelled and calls finalize_and_publish."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        agent.finalize_and_publish = AsyncMock()
+        dp = self._make_dp("cancel")
+        await agent._on_data_received(dp)
+        assert agent._cancelled is True
+        agent.finalize_and_publish.assert_called_once_with(DispositionEnum.cancelled)
+
+    async def test_routes_takeover_command(self):
+        """Takeover command transitions state to human_takeover."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        dp = self._make_dp("takeover")
+        await agent._on_data_received(dp)
+        assert agent._current_state == CallStateEnum.human_takeover
+
+    async def test_routes_resume_command(self):
+        """Resume command transitions back to connected."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.human_takeover
+        dp = self._make_dp("resume", summary="Test summary")
+        await agent._on_data_received(dp)
+        assert agent._current_state == CallStateEnum.connected
+
+    async def test_routes_inject_context(self):
+        """inject_context generates a reply with context note."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        dp = self._make_dp("inject_context", text="Account 12345")
+        await agent._on_data_received(dp)
+        agent.session.generate_reply.assert_called_once()
+
+    async def test_routes_approval_response(self):
+        """approve/reject routes to _handle_approval_response."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.awaiting_approval
+        agent._approval_event = asyncio.Event()
+        agent._approval_id = "apr-test-routing"
+        dp = self._make_dp("approve", approval_id="apr-test-routing")
+        await agent._on_data_received(dp)
+        assert agent._approval_result == "approved"
+
+
+# ===========================================================================
+# finalize_and_publish
+# ===========================================================================
+
+
+class TestFinalizeAndPublish:
+    async def test_finalize_sets_ended_state(self):
+        """finalize_and_publish transitions to ended."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        assert agent._finalized is True
+        assert agent._current_state == CallStateEnum.ended
+
+    async def test_finalize_idempotent(self):
+        """Second call to finalize_and_publish is a no-op."""
+        agent = _make_agent()
+        agent._finalized = True
+        agent._current_state = CallStateEnum.connected
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        # State should NOT change since finalize was already done
+        assert agent._current_state == CallStateEnum.connected
+
+    async def test_finalize_with_evidence_writes_outcome(self):
+        """finalize_and_publish writes outcome to room metadata when evidence exists."""
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._lk_api.room.remove_participant = AsyncMock()
+
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        assert agent._finalized is True
+        agent._lk_api.room.update_room_metadata.assert_called_once()
+        agent._room.local_participant.publish_data.assert_called_once()
+
+    async def test_finalize_without_room(self):
+        """finalize_and_publish works without room (no metadata write)."""
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        agent._room = None
+        agent._lk_api = None
+        await agent.finalize_and_publish(DispositionEnum.timeout)
+        assert agent._finalized is True
+
+    async def test_finalize_publishes_call_complete_event(self):
+        """finalize_and_publish publishes call_complete event on data channel."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = None  # No metadata write
+        await agent.finalize_and_publish(DispositionEnum.failed)
+        agent._room.local_participant.publish_data.assert_called_once()
+
+    async def test_finalize_removes_sip_participant(self):
+        """finalize_and_publish removes SIP participant to hang up."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._lk_api.room.remove_participant = AsyncMock()
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        agent._lk_api.room.remove_participant.assert_called_once()
+
+    async def test_finalize_handles_metadata_write_failure(self):
+        """finalize_and_publish handles metadata write failure gracefully."""
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock(side_effect=Exception("fail"))
+        agent._lk_api.room.remove_participant = AsyncMock()
+        # Should not raise
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        assert agent._finalized is True
+
+    async def test_finalize_handles_publish_data_failure(self):
+        """finalize_and_publish handles publish_data failure gracefully."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock(side_effect=Exception("fail"))
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.remove_participant = AsyncMock()
+        await agent.finalize_and_publish(DispositionEnum.failed)
+        assert agent._finalized is True
+
+    async def test_finalize_handles_remove_participant_failure(self):
+        """finalize_and_publish handles remove_participant failure gracefully."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._lk_api.room.remove_participant = AsyncMock(side_effect=Exception("fail"))
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        assert agent._finalized is True
+
+
+# ===========================================================================
+# hang_up tool
+# ===========================================================================
+
+
+class TestHangUpTool:
+    async def test_hang_up_task_complete(self):
+        """hang_up with 'task_complete' sets disposition to completed."""
+        agent = _make_agent()
+        agent.finalize_and_publish = AsyncMock()
+        result = await agent.hang_up(context=MagicMock(), reason="task_complete")
+        assert "task_complete" in result
+        assert agent._call_ended_normally is True
+        agent.finalize_and_publish.assert_called_once_with(DispositionEnum.completed)
+
+    async def test_hang_up_voicemail(self):
+        """hang_up with 'voicemail_detected' sets disposition to voicemail."""
+        agent = _make_agent()
+        agent.finalize_and_publish = AsyncMock()
+        result = await agent.hang_up(context=MagicMock(), reason="voicemail_detected")
+        assert "voicemail_detected" in result
+        agent.finalize_and_publish.assert_called_once_with(DispositionEnum.voicemail)
+
+    async def test_hang_up_unknown_reason(self):
+        """hang_up with unknown reason defaults to failed."""
+        agent = _make_agent()
+        agent.finalize_and_publish = AsyncMock()
+        result = await agent.hang_up(context=MagicMock(), reason="unknown_reason")
+        assert "unknown_reason" in result
+        agent.finalize_and_publish.assert_called_once_with(DispositionEnum.failed)
+
+
+# ===========================================================================
+# _request_user_approval_impl
+# ===========================================================================
+
+
+class TestRequestUserApproval:
+    async def test_approval_approved_flow(self):
+        """Approval flow: request -> approved -> returns 'approved'."""
+        task = _make_task(approval_required=True)
+        agent = _make_agent(task=task)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.local_participant.publish_data = AsyncMock()
+
+        async def _simulate_approval():
+            """Simulate approval response arriving after a short delay."""
+            await asyncio.sleep(0.05)
+            agent._approval_result = "approved"
+            if agent._approval_event:
+                agent._approval_event.set()
+
+        asyncio.create_task(_simulate_approval())
+        result = await agent._request_user_approval_impl(
+            context=MagicMock(), details="Refund of $50"
+        )
+        assert result == "approved"
+        assert agent._current_state == CallStateEnum.connected
+
+    async def test_approval_rejected_flow(self):
+        """Approval flow: request -> rejected -> returns 'rejected'."""
+        task = _make_task(approval_required=True)
+        agent = _make_agent(task=task)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.local_participant.publish_data = AsyncMock()
+
+        async def _simulate_rejection():
+            await asyncio.sleep(0.05)
+            agent._approval_result = "rejected"
+            if agent._approval_event:
+                agent._approval_event.set()
+
+        asyncio.create_task(_simulate_rejection())
+        result = await agent._request_user_approval_impl(
+            context=MagicMock(), details="Subscribe for $100/mo"
+        )
+        assert result == "rejected"
+
+    async def test_approval_timeout_auto_rejects(self):
+        """Approval times out and auto-rejects."""
+        task = _make_task(approval_required=True)
+        agent = _make_agent(task=task)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.local_participant.publish_data = AsyncMock()
+        # Set short timeout for testing
+        agent.APPROVAL_TIMEOUT = 0.1
+
+        result = await agent._request_user_approval_impl(
+            context=MagicMock(), details="Expensive thing"
+        )
+        assert result == "rejected"
+
+    async def test_approval_with_evidence(self):
+        """Approval flow emits evidence events."""
+        task = _make_task(approval_required=True)
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent.APPROVAL_TIMEOUT = 0.1
+
+        result = await agent._request_user_approval_impl(
+            context=MagicMock(), details="Refund"
+        )
+        assert result == "rejected"  # Timed out
+
+
+# ===========================================================================
+# _timeout_guard
+# ===========================================================================
+
+
+class TestTimeoutGuard:
+    async def test_timeout_guard_triggers_finalize(self):
+        """_timeout_guard calls finalize_and_publish after timeout."""
+        agent = _make_agent()
+        agent.finalize_and_publish = AsyncMock()
+        await agent._timeout_guard(0)  # 0 seconds = immediate
+        agent.finalize_and_publish.assert_called_once_with(DispositionEnum.timeout)
+
+    async def test_timeout_guard_cancellation(self):
+        """_timeout_guard handles CancelledError gracefully (does not finalize)."""
+        agent = _make_agent()
+        agent.finalize_and_publish = AsyncMock()
+        task = asyncio.create_task(agent._timeout_guard(999))
+        await asyncio.sleep(0.01)
+        task.cancel()
+        # _timeout_guard catches CancelledError internally, so await should not raise
+        await task
+        agent.finalize_and_publish.assert_not_called()

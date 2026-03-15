@@ -185,3 +185,112 @@ async def test_do_dial_missing_env_returns_error():
     assert "Missing required environment variables" in result["error"]
     assert any("LIVEKIT_URL" in m for m in result["missing"])
     assert result["help"] == "https://github.com/agent-next/call-use#configure"
+
+
+# ===========================================================================
+# MCP tool wrappers (dial, status, result) — test the tool-level wrappers
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_dial_invalid_json_user_info():
+    """dial returns error when user_info is invalid JSON."""
+    from call_use.mcp_server import dial
+
+    result_str = await dial(phone="+18005551234", instructions="Test", user_info="not-json")
+    result = json.loads(result_str)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_status_tool_wraps_exception(MockLiveKitAPI):
+    """status tool returns error JSON on exception."""
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(side_effect=Exception("boom"))
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import status
+
+    result_str = await status(task_id="call-fail")
+    result = json.loads(result_str)
+    assert "error" in result
+    assert result["task_id"] == "call-fail"
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_result_tool_wraps_exception(MockLiveKitAPI):
+    """result tool returns error JSON on exception."""
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(side_effect=Exception("boom"))
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import result
+
+    result_str = await result(task_id="call-fail")
+    parsed = json.loads(result_str)
+    assert "error" in parsed
+    assert parsed["task_id"] == "call-fail"
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_cancel_tool_wraps_exception(MockLiveKitAPI):
+    """cancel tool returns error JSON on exception."""
+    mock_api = AsyncMock()
+    mock_api.room.send_data = AsyncMock(side_effect=Exception("room gone"))
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import cancel
+
+    result_str = await cancel(task_id="call-fail")
+    parsed = json.loads(result_str)
+    assert "error" in parsed
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_do_result_room_not_found(MockLiveKitAPI):
+    """_do_result returns error when room not found."""
+    mock_api = AsyncMock()
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    result = await _do_result(task_id="call-nonexistent")
+    assert result["error"] == "call not found"
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_do_result_no_metadata(MockLiveKitAPI):
+    """_do_result handles room with no metadata."""
+    mock_api = AsyncMock()
+    mock_room = MagicMock()
+    mock_room.metadata = ""
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    result = await _do_result(task_id="call-empty")
+    assert result["status"] == "in_progress"
+    assert result["state"] == "unknown"
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_dial_tool_success(MockLiveKitAPI):
+    """dial tool returns JSON with task_id on success."""
+    mock_api = AsyncMock()
+    mock_api.room.create_room.return_value = MagicMock()
+    mock_api.agent_dispatch.create_dispatch.return_value = MagicMock()
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import dial
+
+    result_str = await dial(phone="+18005551234", instructions="Test")
+    result = json.loads(result_str)
+    assert "task_id" in result
+    assert result["status"] == "dispatched"
