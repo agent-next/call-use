@@ -117,6 +117,7 @@ class EvidencePipeline:
         # Write JSON log
         try:
             LOGS_DIR.mkdir(parents=True, exist_ok=True, mode=0o700)
+            os.chmod(LOGS_DIR, 0o700)
             log_path = LOGS_DIR / f"{self.task.task_id}.json"
             fd = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
             with open(fd, "w") as f:

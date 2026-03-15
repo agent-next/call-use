@@ -144,6 +144,9 @@ async def test_finalize_log_file_permissions(tmp_path, monkeypatch):
     assert log_file.exists()
     mode = stat.S_IMODE(os.stat(log_file).st_mode)
     assert mode == 0o600, f"Expected 0600, got {oct(mode)}"
+    # Directory must also be restricted to owner-only
+    dir_mode = stat.S_IMODE(os.stat(tmp_path).st_mode)
+    assert dir_mode == 0o700, f"Expected dir 0700, got {oct(dir_mode)}"
 
 
 @pytest.mark.asyncio
