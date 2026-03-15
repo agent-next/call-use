@@ -1,4 +1,4 @@
-.PHONY: test lint format typecheck build check clean
+.PHONY: test lint format typecheck build check clean docs docs-build
 
 test:
 	pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=100
@@ -21,3 +21,9 @@ check: lint typecheck test build
 
 clean:
 	rm -rf dist/ build/ *.egg-info
+
+docs:
+	mkdocs serve
+
+docs-build:
+	mkdocs build
