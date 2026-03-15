@@ -36,7 +36,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy", "hypothesis"]
 docs = [
     "mkdocs-material>=9.0",
     "mkdocstrings[python]>=0.24",
@@ -64,6 +64,15 @@ call_use = ["py.typed"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: Unit tests",
+    "bdd: Behavior-driven scenario tests",
+    "integration: Integration tests across modules",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
 
 [tool.ruff]
 target-version = "py311"

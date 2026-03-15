@@ -76,8 +76,10 @@ class FakeAgentServer:
 
     def rtc_session(self, **kwargs):
         """Pass-through decorator that preserves the original function."""
+
         def decorator(fn):
             return fn
+
         return decorator
 
 
@@ -103,6 +105,7 @@ _setup_agent_mocks()
 # ---------------------------------------------------------------------------
 # Server-specific mocks (needed by test_server.py)
 # ---------------------------------------------------------------------------
+
 
 def _setup_server_mocks():
     """Install server-specific mocks on top of the base livekit mocks."""

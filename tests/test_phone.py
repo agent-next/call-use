@@ -4,6 +4,8 @@ import pytest
 
 from call_use.phone import validate_caller_id, validate_phone_number
 
+pytestmark = pytest.mark.unit
+
 
 class TestValidatePhoneNumber:
     def test_valid_us_number(self):

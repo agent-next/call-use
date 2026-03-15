@@ -15,7 +15,15 @@ from call_use.agent import (
     _LiveKitCallAgent,
 )
 from call_use.evidence import EvidencePipeline
-from call_use.models import CallEvent, CallEventType, CallOutcome, CallStateEnum, CallTask, DispositionEnum
+from call_use.models import (
+    CallEvent,
+    CallEventType,
+    CallStateEnum,
+    CallTask,
+    DispositionEnum,
+)
+
+pytestmark = pytest.mark.unit
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -335,31 +343,37 @@ class TestSIPErrorClassification:
     def test_sip_status_486_maps_to_busy(self):
         from call_use.agent import SIP_DISPOSITION_MAP
         from call_use.models import DispositionEnum
+
         assert SIP_DISPOSITION_MAP["486"] == DispositionEnum.busy
 
     def test_sip_status_480_maps_to_no_answer(self):
         from call_use.agent import SIP_DISPOSITION_MAP
         from call_use.models import DispositionEnum
+
         assert SIP_DISPOSITION_MAP["480"] == DispositionEnum.no_answer
 
     def test_sip_status_408_maps_to_no_answer(self):
         from call_use.agent import SIP_DISPOSITION_MAP
         from call_use.models import DispositionEnum
+
         assert SIP_DISPOSITION_MAP["408"] == DispositionEnum.no_answer
 
     def test_sip_status_487_maps_to_cancelled(self):
         from call_use.agent import SIP_DISPOSITION_MAP
         from call_use.models import DispositionEnum
+
         assert SIP_DISPOSITION_MAP["487"] == DispositionEnum.cancelled
 
     def test_classify_sip_error_with_status(self):
         from call_use.agent import classify_sip_error
         from call_use.models import DispositionEnum
+
         assert classify_sip_error("486", "busy here") == DispositionEnum.busy
 
     def test_classify_sip_error_fallback_string_match(self):
         from call_use.agent import classify_sip_error
         from call_use.models import DispositionEnum
+
         assert classify_sip_error("", "line is busy") == DispositionEnum.busy
         assert classify_sip_error("", "no answer from callee") == DispositionEnum.no_answer
         assert classify_sip_error("", "went to voicemail") == DispositionEnum.voicemail
@@ -367,6 +381,7 @@ class TestSIPErrorClassification:
     def test_classify_sip_error_unknown(self):
         from call_use.agent import classify_sip_error
         from call_use.models import DispositionEnum
+
         assert classify_sip_error("", "something weird") == DispositionEnum.failed
 
 
@@ -800,9 +815,7 @@ class TestRequestUserApproval:
         agent._room.local_participant.publish_data = AsyncMock()
         agent.APPROVAL_TIMEOUT = 0.1
 
-        result = await agent._request_user_approval_impl(
-            context=MagicMock(), details="Refund"
-        )
+        result = await agent._request_user_approval_impl(context=MagicMock(), details="Refund")
         assert result == "rejected"  # Timed out
 
 
@@ -880,9 +893,7 @@ class TestApprovalEarlyReturn:
 
         agent._set_state = _set_state_and_change
 
-        result = await agent._request_user_approval_impl(
-            context=MagicMock(), details="Test"
-        )
+        result = await agent._request_user_approval_impl(context=MagicMock(), details="Test")
         assert result == "cancelled"
 
 
@@ -915,6 +926,7 @@ def _make_mock_ctx(room_name="test-room"):
         def decorator(fn):
             room_handlers[event_name] = fn
             return fn
+
         return decorator
 
     mock_ctx.room.on = mock_room_on
@@ -932,6 +944,7 @@ def _make_mock_session():
         def decorator(fn):
             session_handlers[event_name] = fn
             return fn
+
         return decorator
 
     mock_session.on = mock_session_on
@@ -1376,16 +1389,18 @@ class TestEntrypoint:
             mock_ctx.room = MagicMock()
             mock_ctx.room.name = "call-test-entry"
             mock_ctx.job = MagicMock()
-            mock_ctx.job.metadata = json.dumps({
-                "phone_number": "+12025551234",
-                "instructions": "Test call",
-                "caller_id": "+18005559876",
-                "user_info": {"name": "Test"},
-                "voice_id": "nova",
-                "approval_required": False,
-                "timeout_seconds": 300,
-                "recording_disclaimer": "This call is recorded.",
-            })
+            mock_ctx.job.metadata = json.dumps(
+                {
+                    "phone_number": "+12025551234",
+                    "instructions": "Test call",
+                    "caller_id": "+18005559876",
+                    "user_info": {"name": "Test"},
+                    "voice_id": "nova",
+                    "approval_required": False,
+                    "timeout_seconds": 300,
+                    "recording_disclaimer": "This call is recorded.",
+                }
+            )
 
             await entrypoint(mock_ctx)
 

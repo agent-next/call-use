@@ -8,6 +8,8 @@ import pytest
 
 from call_use.mcp_server import _do_dial, _do_result, _do_status
 
+pytestmark = pytest.mark.unit
+
 _FULL_ENV = {
     "LIVEKIT_URL": "wss://test",
     "LIVEKIT_API_KEY": "key",
@@ -301,16 +303,18 @@ async def test_result_tool_returns_json_on_success(MockLiveKitAPI):
     """result tool returns JSON on success (covers line 223)."""
     mock_api = AsyncMock()
     mock_room = MagicMock()
-    mock_room.metadata = json.dumps({
-        "state": "ended",
-        "outcome": {
-            "task_id": "call-test-result",
-            "disposition": "completed",
-            "duration_seconds": 15.0,
-            "transcript": [],
-            "events": [],
-        },
-    })
+    mock_room.metadata = json.dumps(
+        {
+            "state": "ended",
+            "outcome": {
+                "task_id": "call-test-result",
+                "disposition": "completed",
+                "duration_seconds": 15.0,
+                "transcript": [],
+                "events": [],
+            },
+        }
+    )
     mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)

@@ -11,6 +11,8 @@ import pytest
 
 from call_use.sdk import CallAgent
 
+pytestmark = pytest.mark.unit
+
 
 class TestCallAgentConstructor:
     def test_valid_inputs(self):
@@ -137,9 +139,7 @@ class TestSendCommand:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_api.room.send_data = AsyncMock()
 
@@ -160,9 +160,7 @@ class TestSendCommand:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_api.room.send_data = AsyncMock()
 
@@ -183,9 +181,7 @@ class TestSendCommand:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_api.room.send_data = AsyncMock()
 
@@ -204,9 +200,7 @@ class TestGetAgentIdentity:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-xyz"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-xyz"}')])
         )
         result = await _get_agent_identity(mock_api, "test-room")
         assert result == "agent-xyz"
@@ -216,9 +210,7 @@ class TestGetAgentIdentity:
         from call_use.sdk import _get_agent_identity
 
         mock_api = AsyncMock()
-        mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[])
-        )
+        mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
         with pytest.raises(RuntimeError, match="not found"):
             await _get_agent_identity(mock_api, "missing-room")
 
@@ -228,9 +220,7 @@ class TestGetAgentIdentity:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"state": "created"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"state": "created"}')])
         )
         with pytest.raises(RuntimeError, match="not yet initialized"):
             await _get_agent_identity(mock_api, "test-room")
@@ -255,6 +245,7 @@ class TestCallAgentCallMethod:
                 nonlocal data_handler
                 data_handler = fn
                 return fn
+
             return decorator
 
         mock_room.on = capture_handler
@@ -269,11 +260,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -285,19 +279,21 @@ class TestCallAgentCallMethod:
                 if data_handler:
                     dp = MagicMock()
                     dp.topic = "call-events"
-                    dp.data = json.dumps({
-                        "type": "call_complete",
-                        "data": {
-                            "task_id": "test-123",
-                            "transcript": [],
-                            "events": [],
-                            "duration_seconds": 10.0,
-                            "disposition": "completed",
-                        },
-                    }).encode()
+                    dp.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {
+                                "task_id": "test-123",
+                                "transcript": [],
+                                "events": [],
+                                "duration_seconds": 10.0,
+                                "disposition": "completed",
+                            },
+                        }
+                    ).encode()
                     data_handler(dp)
 
-            task = asyncio.create_task(_simulate_complete())
+            asyncio.create_task(_simulate_complete())
             outcome = await agent.call()
             assert outcome.disposition == "completed"
             mock_room.disconnect.assert_called_once()
@@ -325,11 +321,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -355,6 +354,7 @@ class TestCallAgentCallMethod:
                 nonlocal data_handler
                 data_handler = fn
                 return fn
+
             return decorator
 
         mock_room.on = capture_handler
@@ -369,11 +369,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -412,6 +415,7 @@ class TestCallAgentCallMethod:
                 nonlocal data_handler
                 data_handler = fn
                 return fn
+
             return decorator
 
         mock_room.on = capture_handler
@@ -425,11 +429,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -441,28 +448,32 @@ class TestCallAgentCallMethod:
                     # First: a transcript event (non-complete, fires on_event)
                     dp = MagicMock()
                     dp.topic = "call-events"
-                    dp.data = json.dumps({
-                        "type": "transcript",
-                        "data": {"speaker": "agent", "text": "Hi"},
-                    }).encode()
+                    dp.data = json.dumps(
+                        {
+                            "type": "transcript",
+                            "data": {"speaker": "agent", "text": "Hi"},
+                        }
+                    ).encode()
                     data_handler(dp)
                     await asyncio.sleep(0.05)
                     # Then: call_complete
                     dp2 = MagicMock()
                     dp2.topic = "call-events"
-                    dp2.data = json.dumps({
-                        "type": "call_complete",
-                        "data": {
-                            "task_id": "test-ev",
-                            "transcript": [],
-                            "events": [],
-                            "duration_seconds": 5.0,
-                            "disposition": "completed",
-                        },
-                    }).encode()
+                    dp2.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {
+                                "task_id": "test-ev",
+                                "transcript": [],
+                                "events": [],
+                                "duration_seconds": 5.0,
+                                "disposition": "completed",
+                            },
+                        }
+                    ).encode()
                     data_handler(dp2)
 
-            task = asyncio.create_task(_simulate_events())
+            asyncio.create_task(_simulate_events())
             outcome = await agent.call()
             assert outcome.disposition == "completed"
             # Give the executor time to fire the callback
@@ -486,6 +497,7 @@ class TestCallAgentCallMethod:
                 nonlocal data_handler
                 data_handler = fn
                 return fn
+
             return decorator
 
         mock_room.on = capture_handler
@@ -496,9 +508,7 @@ class TestCallAgentCallMethod:
         mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
         # Mock for _send_approval_response
         mock_lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_lkapi.room.send_data = AsyncMock()
 
@@ -506,11 +516,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -522,31 +535,35 @@ class TestCallAgentCallMethod:
                     # Send approval request
                     dp = MagicMock()
                     dp.topic = "call-events"
-                    dp.data = json.dumps({
-                        "type": "approval_request",
-                        "data": {
-                            "approval_id": "apr-test",
-                            "details": "Refund $50",
-                        },
-                    }).encode()
+                    dp.data = json.dumps(
+                        {
+                            "type": "approval_request",
+                            "data": {
+                                "approval_id": "apr-test",
+                                "details": "Refund $50",
+                            },
+                        }
+                    ).encode()
                     data_handler(dp)
                     await asyncio.sleep(0.2)  # Give time for approval handling
                     # Then complete
                     dp2 = MagicMock()
                     dp2.topic = "call-events"
-                    dp2.data = json.dumps({
-                        "type": "call_complete",
-                        "data": {
-                            "task_id": "test-apr",
-                            "transcript": [],
-                            "events": [],
-                            "duration_seconds": 10.0,
-                            "disposition": "completed",
-                        },
-                    }).encode()
+                    dp2.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {
+                                "task_id": "test-apr",
+                                "transcript": [],
+                                "events": [],
+                                "duration_seconds": 10.0,
+                                "disposition": "completed",
+                            },
+                        }
+                    ).encode()
                     data_handler(dp2)
 
-            task = asyncio.create_task(_simulate_approval_then_complete())
+            asyncio.create_task(_simulate_approval_then_complete())
             outcome = await agent.call()
             assert outcome.disposition == "completed"
 
@@ -568,29 +585,32 @@ class TestCallAgentCallMethod:
         mock_lkapi = AsyncMock()
         mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
         mock_fallback_room = MagicMock()
-        mock_fallback_room.metadata = json.dumps({
-            "state": "ended",
-            "outcome": {
-                "task_id": "test-fallback",
-                "transcript": [],
-                "events": [],
-                "duration_seconds": 20.0,
-                "disposition": "completed",
-            },
-        })
-        mock_lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[mock_fallback_room])
+        mock_fallback_room.metadata = json.dumps(
+            {
+                "state": "ended",
+                "outcome": {
+                    "task_id": "test-fallback",
+                    "transcript": [],
+                    "events": [],
+                    "duration_seconds": 20.0,
+                    "disposition": "completed",
+                },
+            }
         )
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_fallback_room]))
 
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
@@ -634,11 +654,14 @@ class TestCallAgentCallMethod:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-                "LIVEKIT_URL": "wss://test",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
         ):
             MockToken.return_value.to_jwt.return_value = "fake-jwt"
             MockLKAPI.return_value.__aenter__ = mock_aenter
@@ -659,9 +682,7 @@ class TestCallAgentCallMethod:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_api.room.send_data = AsyncMock()
 
@@ -680,13 +701,17 @@ class TestCallAgentCallMethod:
 
             with (
                 patch("call_use.sdk.api.AccessToken") as MockToken,
-                patch.dict(os.environ, {
-                    "LIVEKIT_API_KEY": "test-key",
-                    "LIVEKIT_API_SECRET": "test-secret",
-                }),
+                patch.dict(
+                    os.environ,
+                    {
+                        "LIVEKIT_API_KEY": "test-key",
+                        "LIVEKIT_API_SECRET": "test-secret",
+                    },
+                ),
             ):
                 MockToken.return_value.to_jwt.return_value = "jwt"
                 import pytest as pt
+
                 with pt.raises(RuntimeError, match="room name unavailable"):
                     await agent.takeover()
 
@@ -701,19 +726,20 @@ class TestCallAgentCallMethod:
 
         mock_api = AsyncMock()
         mock_api.room.list_rooms = AsyncMock(
-            return_value=MagicMock(
-                rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')]
-            )
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
         )
         mock_api.room.send_data = AsyncMock()
 
         with (
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
             patch("call_use.sdk.api.AccessToken") as MockToken,
-            patch.dict(os.environ, {
-                "LIVEKIT_API_KEY": "test-key",
-                "LIVEKIT_API_SECRET": "test-secret",
-            }),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                },
+            ),
         ):
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)

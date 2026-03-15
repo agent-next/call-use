@@ -15,6 +15,8 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from call_use.server import create_app  # noqa: E402
 
+pytestmark = pytest.mark.integration
+
 API_KEY = "test-api-key-12345"
 
 
@@ -316,9 +318,7 @@ def _create_call_and_setup_mocks(client, headers, agent_identity="agent-test123"
     mock_token_instance = MagicMock()
     mock_token_instance.to_jwt.return_value = "fake-jwt-token"
 
-    with patch.object(
-        sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
-    ):
+    with patch.object(sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance):
         create_resp = client.post(
             "/calls",
             json={
@@ -337,9 +337,7 @@ def _create_call_and_setup_mocks(client, headers, agent_identity="agent-test123"
     lkapi_instance.room = MagicMock()
     lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
     lkapi_instance.room.send_data = AsyncMock()
-    lkapi_instance.room.list_participants = AsyncMock(
-        return_value=MagicMock(participants=[])
-    )
+    lkapi_instance.room.list_participants = AsyncMock(return_value=MagicMock(participants=[]))
     lkapi_instance.room.update_participant = AsyncMock()
 
     return task_id, mock_room, lkapi_instance
@@ -398,15 +396,11 @@ class TestTakeoverEndpoint:
         # Mock the polling: first call returns connected, second returns human_takeover
         takeover_room = MagicMock()
         takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[takeover_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[takeover_room]))
 
         mock_token = MagicMock()
         mock_token.to_jwt.return_value = "takeover-jwt-token"
-        with patch.object(
-            sys.modules["livekit"].api, "AccessToken", return_value=mock_token
-        ):
+        with patch.object(sys.modules["livekit"].api, "AccessToken", return_value=mock_token):
             resp = client.post(f"/calls/{task_id}/takeover", headers=headers)
 
         assert resp.status_code == 200
@@ -421,9 +415,7 @@ class TestTakeoverEndpoint:
         # Mock polling: always returns connected (never acks takeover)
         connected_room = MagicMock()
         connected_room.metadata = '{"state": "connected", "agent_identity": "agent-test123"}'
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[connected_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[connected_room]))
 
         resp = client.post(f"/calls/{task_id}/takeover", headers=headers)
         assert resp.status_code == 504
@@ -495,9 +487,7 @@ class TestApproveEndpoint:
             '"state": "awaiting_approval", '
             '"approval_id": "apr-test-1"}'
         )
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[approval_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[approval_room]))
 
         resp = client.post(f"/calls/{task_id}/approve", headers=headers)
         assert resp.status_code == 200
@@ -512,9 +502,7 @@ class TestApproveEndpoint:
         # Room has agent but no approval_id
         no_approval_room = MagicMock()
         no_approval_room.metadata = '{"agent_identity": "agent-test123", "state": "connected"}'
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[no_approval_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_approval_room]))
 
         resp = client.post(f"/calls/{task_id}/approve", headers=headers)
         assert resp.status_code == 409
@@ -536,9 +524,7 @@ class TestRejectEndpoint:
             '"state": "awaiting_approval", '
             '"approval_id": "apr-test-2"}'
         )
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[approval_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[approval_room]))
 
         resp = client.post(f"/calls/{task_id}/reject", headers=headers)
         assert resp.status_code == 200
@@ -553,9 +539,7 @@ class TestRejectEndpoint:
         # Room with no agent_identity
         no_agent_room = MagicMock()
         no_agent_room.metadata = '{"state": "created"}'
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[no_agent_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_agent_room]))
 
         resp = client.post(f"/calls/{task_id}/reject", headers=headers)
         assert resp.status_code == 409
@@ -642,7 +626,7 @@ class TestTakeoverRoomClosed:
         lkapi.room.list_rooms = AsyncMock(
             side_effect=[
                 MagicMock(rooms=[mock_room]),  # _get_agent_identity
-                MagicMock(rooms=[]),            # polling - room closed
+                MagicMock(rooms=[]),  # polling - room closed
             ]
         )
         resp = client.post(f"/calls/{task_id}/takeover", headers=headers)
@@ -664,7 +648,7 @@ class TestResumeEdgeCases:
             side_effect=[
                 MagicMock(rooms=[takeover_room]),  # _get_agent_identity
                 MagicMock(rooms=[takeover_room]),  # _get_room_state
-                MagicMock(rooms=[]),                # polling - room closed
+                MagicMock(rooms=[]),  # polling - room closed
             ]
         )
         resp = client.post(
@@ -680,9 +664,7 @@ class TestResumeEdgeCases:
         takeover_room = MagicMock()
         takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
         # Never transitions to connected
-        lkapi.room.list_rooms = AsyncMock(
-            return_value=MagicMock(rooms=[takeover_room])
-        )
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[takeover_room]))
         resp = client.post(
             f"/calls/{task_id}/resume",
             json={"summary": "test"},

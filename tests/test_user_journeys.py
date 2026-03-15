@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.bdd
+
+
 # Mock livekit before any call_use imports that trigger SDK/server loading
 for _mod in [
     "livekit",

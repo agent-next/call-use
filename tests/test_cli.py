@@ -1,14 +1,15 @@
 """Tests for call-use CLI and __init__ lazy imports."""
 
-import asyncio
 import json
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
-import click
+import pytest
 from click.testing import CliRunner
 
 from call_use.cli import main
+
+pytestmark = pytest.mark.unit
 
 
 # ===========================================================================
@@ -43,8 +44,6 @@ class TestLazyImports:
     def test_nonexistent_attr_raises(self):
         """Accessing a nonexistent attribute raises AttributeError (line 45)."""
         import call_use
-
-        import pytest
 
         with pytest.raises(AttributeError, match="no attribute"):
             _ = call_use.nonexistent_thing
@@ -419,7 +418,7 @@ class TestRunCall:
 
         with patch("call_use.sdk.CallAgent") as MockAgent:
             MockAgent.return_value.call = AsyncMock(return_value=mock_outcome)
-            result = _run_call(
+            _run_call(
                 phone="+12025551234",
                 instructions="Test",
                 approval_required=True,
