@@ -114,7 +114,10 @@ class CallAgent:
 
             if self._on_event:
                 loop = asyncio.get_running_loop()
-                loop.run_in_executor(None, self._on_event, event)
+                fut = loop.run_in_executor(None, self._on_event, event)
+                fut.add_done_callback(
+                    lambda f: f.exception() and logger.warning("on_event callback error: %s", f.exception())
+                )
 
             if event.type == CallEventType.call_complete:
                 try:
