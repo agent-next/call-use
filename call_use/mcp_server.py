@@ -26,6 +26,13 @@ from call_use.phone import validate_caller_id, validate_phone_number
 
 logger = logging.getLogger(__name__)
 
+# Validation constants — must match REST API (server.py) and agent.py
+MAX_INSTRUCTIONS_LENGTH = 5000
+MIN_TIMEOUT = 30
+MAX_TIMEOUT = 3600
+VALID_VOICES = frozenset({"alloy", "echo", "fable", "onyx", "nova", "shimmer"})
+MAX_USER_INFO_SIZE = 10000
+
 mcp = FastMCP(
     "call-use",
     instructions=(
@@ -57,6 +64,28 @@ async def _do_dial(
             "missing": missing,
             "help": "https://github.com/agent-next/call-use#configure",
         }
+
+    # --- Input validation (match REST API constraints) ---
+    if len(instructions) > MAX_INSTRUCTIONS_LENGTH:
+        return {
+            "error": f"instructions too long ({len(instructions)} chars, max {MAX_INSTRUCTIONS_LENGTH})"
+        }
+    if not (MIN_TIMEOUT <= timeout <= MAX_TIMEOUT):
+        return {
+            "error": f"timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds, got {timeout}"
+        }
+    if voice_id and voice_id not in VALID_VOICES:
+        logger.warning("Invalid voice_id %r, falling back to 'alloy'", voice_id)
+        voice_id = "alloy"
+    if user_info is not None:
+        try:
+            serialized = json.dumps(user_info)
+        except (TypeError, ValueError):
+            return {"error": "user_info must be JSON-serializable"}
+        if len(serialized) > MAX_USER_INFO_SIZE:
+            return {
+                "error": f"user_info too large ({len(serialized)} chars, max {MAX_USER_INFO_SIZE})"
+            }
 
     try:
         phone = validate_phone_number(phone)
