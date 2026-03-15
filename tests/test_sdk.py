@@ -747,3 +747,127 @@ class TestCallAgentCallMethod:
 
             jwt = await agent.takeover()
             assert jwt == "human-jwt-token"
+
+
+class TestMalformedEventData:
+    async def test_malformed_call_event_does_not_crash(self):
+        """Malformed event data that fails CallEvent validation is logged and ignored."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            timeout_seconds=0,
+        )
+
+        mock_room = MagicMock()
+        data_handler = None
+
+        def capture_handler(event_name):
+            def decorator(fn):
+                nonlocal data_handler
+                data_handler = fn
+                return fn
+
+            return decorator
+
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            async def _send_malformed_event():
+                await asyncio.sleep(0.01)
+                if data_handler:
+                    dp = MagicMock()
+                    dp.topic = "call-events"
+                    # Missing required fields for CallEvent
+                    dp.data = json.dumps({"bad_field": "no_type"}).encode()
+                    data_handler(dp)
+
+            asyncio.create_task(_send_malformed_event())
+            outcome = await agent.call()
+            # Should not crash; falls through to timeout
+            assert outcome.disposition == "timeout"
+
+    async def test_malformed_call_outcome_still_sets_complete(self):
+        """Malformed CallOutcome data still sets call_complete so timeout fallback works."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+        )
+
+        mock_room = MagicMock()
+        data_handler = None
+
+        def capture_handler(event_name):
+            def decorator(fn):
+                nonlocal data_handler
+                data_handler = fn
+                return fn
+
+            return decorator
+
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            async def _send_bad_outcome():
+                await asyncio.sleep(0.05)
+                if data_handler:
+                    dp = MagicMock()
+                    dp.topic = "call-events"
+                    # Valid CallEvent type but invalid CallOutcome data
+                    dp.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {"invalid": "missing required fields"},
+                        }
+                    ).encode()
+                    data_handler(dp)
+
+            asyncio.create_task(_send_bad_outcome())
+            outcome = await agent.call()
+            # call_complete.set() is still called, so we get timeout fallback (no rooms)
+            assert outcome.disposition == "timeout"
