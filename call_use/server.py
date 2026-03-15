@@ -190,9 +190,6 @@ def create_app(api_key: str | None = None) -> FastAPI:
                     api.ListParticipantsRequest(room=room_name)
                 )
                 participants = [p.identity for p in parts.participants]
-        if state == "ended":
-            _cleanup_call(call_id)
-
         return CallStatusResponse(
             task_id=call_id,
             state=state,
@@ -373,6 +370,7 @@ def create_app(api_key: str | None = None) -> FastAPI:
                     destination_identities=[agent_id],
                 )
             )
+        _cleanup_call(call_id)
         return {"status": "cancelling", "call_id": call_id}
 
     return app
