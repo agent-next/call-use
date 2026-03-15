@@ -20,8 +20,6 @@ Today we are releasing **call-use v0.1.0**, an open-source outbound call-control
 
 call-use is a self-hostable Python runtime that connects AI agents to the public telephone network. It handles the entire call lifecycle: dialing via Twilio SIP, managing the voice pipeline (Deepgram STT, GPT-4o LLM, OpenAI TTS), navigating IVR menus, and returning a structured outcome with a full transcript.
 
-Think of it as the [browser-use](https://github.com/browser-use/browser-use) for phones. Where browser-use gives agents a browser, call-use gives them a phone.
-
 It is framework-agnostic. It works with LangChain, OpenAI Agents SDK, Claude Code (via MCP), CrewAI, or any agent that can run a shell command.
 
 ## Three lines to make a call

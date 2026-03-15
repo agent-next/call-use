@@ -40,3 +40,17 @@ __pycache__/
 site/
 .coverage
 .hypothesis/
+.superpowers/
+
+# KMS keys and secrets
+KMS/
+
+# Claude / Skill configs (project-local, not for source control)
+CLAUDE.md
+SKILL.md
+
+# Test and coverage artifacts
+test-results.xml
+coverage.xml
+.pytest_cache/
+.ruff_cache/

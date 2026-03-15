@@ -9,7 +9,7 @@ description = "Open-source outbound call-control runtime for agent builders"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "agent-next"}]
-keywords = ["ai", "agent", "phone", "call", "voice", "livekit", "browser-use", "computer-use"]
+keywords = ["ai", "agent", "phone", "call", "voice", "livekit", "telephony", "twilio", "sip", "outbound-calls"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

@@ -2,6 +2,17 @@
 
 All notable changes to call-use will be documented in this file.
 
+## [0.1.1] — 2026-03-15
+
+### Changed
+- Rewrote README for clarity and impact
+- Reduced external project references
+- Fixed hardcoded version in tests
+
+### Security
+- 5 HIGH-severity security fixes (timing-safe API key comparison, cryptographic task IDs, input validation limits, MCP phone validation, voice_id allowlist)
+- Added legal notice to README
+
 ## [0.1.0] — 2026-03-14
 
 ### Added
