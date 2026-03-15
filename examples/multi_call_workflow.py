@@ -66,6 +66,7 @@ async def call_1_check_balance() -> float | None:
         ),
         user_info=USER_INFO,
         on_event=make_transcript_printer("Bank"),
+        approval_required=False,
     )
 
     outcome = await agent.call()
@@ -103,8 +104,7 @@ async def call_2_request_credit_increase(current_balance: float):
 
     outcome = await agent.call()
     print(f"  Disposition: {outcome.disposition.value}")
-    if outcome.summary:
-        print(f"  Summary: {outcome.summary}")
+    print(f"  Transcript: {len(outcome.transcript)} turns")
 
 
 async def main():

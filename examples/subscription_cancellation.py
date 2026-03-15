@@ -48,8 +48,7 @@ async def main():
         elif event.type.value == "state_change":
             state = event.data.get("to", "")
             print(f"  State -> {state}")
-            if state == "transferred":
-                print("  (transferred — likely to retention department)")
+
 
     def on_approval(details):
         detail_text = details.get("details", "")
@@ -76,8 +75,7 @@ async def main():
     print(f"Offers received: {len(retention_offers)}")
     for i, offer in enumerate(retention_offers, 1):
         print(f"  Offer {i}: {offer}")
-    if outcome.summary:
-        print(f"Summary:         {outcome.summary}")
+    print(f"Transcript:      {len(outcome.transcript)} turns")
 
 
 if __name__ == "__main__":

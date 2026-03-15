@@ -58,7 +58,7 @@ def on_event(event):
 Run multiple `CallAgent` calls sequentially and pass data between them:
 ```python
 outcome1 = await agent1.call()
-# inspect outcome1.transcript, outcome1.summary ...
+# inspect outcome1.transcript, outcome1.disposition ...
 outcome2 = await agent2.call()
 ```
 

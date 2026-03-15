@@ -35,8 +35,6 @@ async def main():
             print(f"  [{speaker}] {text}")
         elif event.type.value == "state_change":
             print(f"  State: {event.data.get('from')} -> {event.data.get('to')}")
-        elif event.type.value == "action":
-            print(f"  Action: {event.data.get('action')}")
 
     def on_approval(details):
         # Surface the proposed appointment details before committing
@@ -63,8 +61,6 @@ async def main():
     print("\n--- Call Complete ---")
     print(f"Duration:    {outcome.duration_seconds:.1f}s")
     print(f"Disposition: {outcome.disposition.value}")
-    if outcome.summary:
-        print(f"Summary:     {outcome.summary}")
     print(f"Transcript:  {len(outcome.transcript)} turns")
 
 
