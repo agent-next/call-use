@@ -179,9 +179,8 @@ def _check_livekit_connectivity() -> tuple[bool, str]:
         from livekit.api import LiveKitAPI
 
         async def _probe():
-            lkapi = LiveKitAPI()
-            await lkapi.room.list_rooms()
-            await lkapi.aclose()
+            async with LiveKitAPI() as lkapi:
+                await lkapi.room.list_rooms()
 
         asyncio.run(_probe())
         return True, "LiveKit connection OK"
