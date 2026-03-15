@@ -141,6 +141,20 @@ async def test_finalize_twice_is_safe():
 
 
 @pytest.mark.asyncio
+async def test_finalize_handles_log_write_failure(monkeypatch):
+    """finalize handles log write failure gracefully (logs warning, still returns outcome)."""
+    # Make LOGS_DIR point to an invalid path to trigger the except branch
+    monkeypatch.setattr("call_use.evidence.LOGS_DIR", type("FakePath", (), {
+        "mkdir": staticmethod(lambda **kw: (_ for _ in ()).throw(PermissionError("no perms"))),
+    })())
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hi")
+    outcome = pipe.finalize(DispositionEnum.completed)
+    assert isinstance(outcome, CallOutcome)
+    assert outcome.disposition == DispositionEnum.completed
+
+
+@pytest.mark.asyncio
 async def test_empty_pipeline_finalizes():
     pipe = _make_pipeline()
     outcome = pipe.finalize(DispositionEnum.cancelled)

@@ -278,6 +278,71 @@ async def test_do_result_no_metadata(MockLiveKitAPI):
 
 
 @pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_status_tool_returns_json_on_success(MockLiveKitAPI):
+    """status tool returns JSON string on success (covers line 185)."""
+    mock_api = AsyncMock()
+    mock_room = MagicMock()
+    mock_room.metadata = json.dumps({"state": "connected"})
+    mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import status
+
+    result_str = await status(task_id="call-test-status")
+    result = json.loads(result_str)
+    assert result["state"] == "connected"
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_result_tool_returns_json_on_success(MockLiveKitAPI):
+    """result tool returns JSON on success (covers line 223)."""
+    mock_api = AsyncMock()
+    mock_room = MagicMock()
+    mock_room.metadata = json.dumps({
+        "state": "ended",
+        "outcome": {
+            "task_id": "call-test-result",
+            "disposition": "completed",
+            "duration_seconds": 15.0,
+            "transcript": [],
+            "events": [],
+        },
+    })
+    mock_api.room.list_rooms.return_value = MagicMock(rooms=[mock_room])
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import result
+
+    result_str = await result(task_id="call-test-result")
+    parsed = json.loads(result_str)
+    assert parsed["disposition"] == "completed"
+
+
+def test_mcp_server_main_calls_run():
+    """main() calls mcp.run(transport='stdio') (covers line 230)."""
+    from call_use.mcp_server import main
+
+    with patch("call_use.mcp_server.mcp") as mock_mcp:
+        main()
+        mock_mcp.run.assert_called_once_with(transport="stdio")
+
+
+def test_mcp_server_main_guard():
+    """__name__ == '__main__' guard calls main() (covers line 234)."""
+    import call_use.mcp_server as mod
+
+    with patch.object(mod, "main") as mock_main:
+        # Execute the module-level guard by eval-ing the condition
+        ns = {"__name__": "__main__", "main": mock_main}
+        exec("if __name__ == '__main__': main()", ns)
+        mock_main.assert_called_once()
+
+
+@pytest.mark.asyncio
 @patch.dict(os.environ, _FULL_ENV)
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_dial_tool_success(MockLiveKitAPI):

@@ -38,7 +38,7 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - run: pip install -e ".[dev]"
-      - run: pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=80
+      - run: pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=100
 
   build:
     runs-on: ubuntu-latest

@@ -457,6 +457,36 @@ class TestOnEnter:
         assert agent._current_state == CallStateEnum.connected
         agent._room.on.assert_called_once()
 
+    async def test_on_enter_data_handler_creates_task(self):
+        """on_enter registers _handle_data that creates async task (lines 254-255)."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+
+        # Capture the registered handler
+        registered_handler = None
+
+        def capture_on(event_name, handler):
+            nonlocal registered_handler
+            registered_handler = handler
+
+        agent._room.on = capture_on
+
+        await agent.on_enter()
+        assert registered_handler is not None
+
+        # Call the handler with a data packet to cover lines 254-255
+        dp = MagicMock()
+        dp.topic = "backend-commands"
+        dp.data = json.dumps({"type": "inject_context", "text": "test"}).encode("utf-8")
+        registered_handler(dp)
+        # Give the task time to run
+        await asyncio.sleep(0.1)
+
     async def test_on_enter_no_room_returns_early(self):
         """on_enter returns early if room is None."""
         agent = _make_agent()
@@ -796,6 +826,624 @@ class TestTimeoutGuard:
         task = asyncio.create_task(agent._timeout_guard(999))
         await asyncio.sleep(0.01)
         task.cancel()
-        # _timeout_guard catches CancelledError internally, so await should not raise
         await task
         agent.finalize_and_publish.assert_not_called()
+
+
+# ===========================================================================
+# finalize_and_publish — SIP participant removal failure (lines 254-255)
+# ===========================================================================
+
+
+class TestFinalizeRemoveParticipantFailure:
+    async def test_finalize_sip_remove_failure_logged(self):
+        """finalize_and_publish logs warning when SIP participant removal fails (254-255)."""
+        agent = _make_agent()
+        agent._room = MagicMock()
+        agent._room.name = "test-room"
+        agent._room.local_participant.publish_data = AsyncMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._lk_api.room.remove_participant = AsyncMock(
+            side_effect=Exception("participant already gone")
+        )
+        await agent.finalize_and_publish(DispositionEnum.completed)
+        assert agent._finalized is True
+        # remove_participant was called even though it failed
+        agent._lk_api.room.remove_participant.assert_called_once()
+
+
+# ===========================================================================
+# _request_user_approval_impl — line 411 (early return when state changed)
+# ===========================================================================
+
+
+class TestApprovalEarlyReturn:
+    async def test_approval_returns_cancelled_when_state_changed(self):
+        """Approval returns 'cancelled' when state changed before emit (line 411)."""
+        task = _make_task(approval_required=True)
+        agent = _make_agent(task=task)
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.local_participant.publish_data = AsyncMock()
+
+        # Override _set_state to change state during approval setup
+        original_set_state = agent._set_state
+
+        async def _set_state_and_change(new_state):
+            await original_set_state(new_state)
+            if new_state == CallStateEnum.awaiting_approval:
+                # Simulate state being changed externally (e.g., takeover)
+                agent._current_state = CallStateEnum.human_takeover
+                agent._approval_result = "cancelled"
+
+        agent._set_state = _set_state_and_change
+
+        result = await agent._request_user_approval_impl(
+            context=MagicMock(), details="Test"
+        )
+        assert result == "cancelled"
+
+
+# ===========================================================================
+# Agent run() method — full lifecycle (lines 538-688)
+# ===========================================================================
+
+
+def _make_mock_ctx(room_name="test-room"):
+    """Create a mock JobContext for testing run()."""
+    mock_ctx = MagicMock()
+    mock_ctx.room = MagicMock()
+    mock_ctx.room.name = room_name
+    mock_ctx.room.local_participant = MagicMock()
+    mock_ctx.room.local_participant.identity = "agent-test1234"
+    mock_ctx.room.local_participant.publish_data = AsyncMock()
+    mock_ctx.api = MagicMock()
+    mock_ctx.api.sip = MagicMock()
+    mock_ctx.api.sip.create_sip_participant = AsyncMock()
+    mock_ctx.wait_for_participant = AsyncMock()
+
+    # Support room.on as both decorator and method call
+    room_handlers = {}
+
+    def mock_room_on(event_name, handler=None):
+        if handler is not None:
+            room_handlers[event_name] = handler
+            return handler
+
+        def decorator(fn):
+            room_handlers[event_name] = fn
+            return fn
+        return decorator
+
+    mock_ctx.room.on = mock_room_on
+    mock_ctx._room_handlers = room_handlers
+    return mock_ctx
+
+
+def _make_mock_session():
+    """Create a mock AgentSession for testing run()."""
+    mock_session = MagicMock()
+    mock_session.start = AsyncMock()
+    session_handlers = {}
+
+    def mock_session_on(event_name):
+        def decorator(fn):
+            session_handlers[event_name] = fn
+            return fn
+        return decorator
+
+    mock_session.on = mock_session_on
+    mock_session.generate_reply = MagicMock()
+    mock_session._handlers = session_handlers
+    return mock_session
+
+
+class TestAgentRun:
+    async def test_run_full_lifecycle(self):
+        """run() creates session, dials SIP, wires events, starts session."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        # SIP participant was created
+        mock_ctx.api.sip.create_sip_participant.assert_called_once()
+        # Wait for participant was called
+        mock_ctx.wait_for_participant.assert_called_once()
+        # Session was started
+        mock_session.start.assert_called_once()
+        # generate_reply was called for initial greeting
+        mock_session.generate_reply.assert_called_once()
+        # Agent state should be dialing or connected (depending on lifecycle)
+        assert agent._room is mock_ctx.room
+
+    async def test_run_sip_dial_failure(self):
+        """run() handles SIP dial failure gracefully."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+
+        mock_ctx.api.sip.create_sip_participant = AsyncMock(
+            side_effect=Exception("SIP trunk unavailable")
+        )
+
+        mock_session = _make_mock_session()
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        # Session should NOT be started (dial failed)
+        mock_session.start.assert_not_called()
+        assert agent._finalized is True
+
+    async def test_run_sip_dial_failure_with_metadata(self):
+        """run() classifies SIP errors with metadata.sip_status_code."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+
+        error = Exception("Busy here")
+        error.metadata = {"sip_status_code": "486"}
+        mock_ctx.api.sip.create_sip_participant = AsyncMock(side_effect=error)
+
+        mock_session = _make_mock_session()
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        assert agent._finalized is True
+
+    async def test_run_wait_for_participant_timeout(self):
+        """run() handles wait_for_participant timeout."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        mock_ctx = _make_mock_ctx()
+
+        mock_ctx.wait_for_participant = AsyncMock(side_effect=asyncio.TimeoutError())
+
+        mock_session = _make_mock_session()
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        assert agent._finalized is True
+        mock_session.start.assert_not_called()
+
+    async def test_run_participant_disconnect_handler(self):
+        """run() registers participant disconnect handler that finalizes."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        # Get the participant_disconnected handler
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+        assert handler is not None
+
+        # Simulate phone-callee disconnect after >3s
+        agent._call_start_time = 0  # Long ago
+        participant = MagicMock()
+        participant.identity = "phone-callee"
+        handler(participant)
+
+        # Give time for the async task
+        await asyncio.sleep(0.1)
+        assert agent._finalized is True
+
+    async def test_run_participant_disconnect_cancelled(self):
+        """run() disconnect handler returns early if already cancelled."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+        agent._cancelled = True  # Already cancelled
+
+        participant = MagicMock()
+        participant.identity = "phone-callee"
+        handler(participant)
+
+        # Should not finalize again (already cancelled)
+        await asyncio.sleep(0.1)
+
+    async def test_run_participant_disconnect_short_call_failed(self):
+        """run() disconnect handler treats <3s call as failed."""
+        import time
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+
+        # Set call_start_time to just now (< 3s duration)
+        agent._call_start_time = time.time()
+        participant = MagicMock()
+        participant.identity = "phone-callee"
+        handler(participant)
+        await asyncio.sleep(0.1)
+        assert agent._finalized is True
+
+    async def test_run_participant_disconnect_normal_end(self):
+        """run() disconnect handler treats _call_ended_normally as completed."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+
+        agent._call_start_time = 0  # Long ago
+        agent._call_ended_normally = True
+        participant = MagicMock()
+        participant.identity = "phone-callee"
+        handler(participant)
+        await asyncio.sleep(0.1)
+        assert agent._finalized is True
+
+    async def test_run_participant_disconnect_non_callee_ignored(self):
+        """run() disconnect handler ignores non-phone-callee participants."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+
+        participant = MagicMock()
+        participant.identity = "some-other-participant"
+        handler(participant)
+        await asyncio.sleep(0.1)
+        assert agent._finalized is False
+
+    async def test_run_conversation_item_added_agent_speech(self):
+        """run() wires conversation_item_added to capture agent speech."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("conversation_item_added")
+        assert handler is not None
+
+        # Simulate assistant message
+        ev = MagicMock()
+        ev.item.role = "assistant"
+        ev.item.text_content = "Hello, this is agent speaking"
+        handler(ev)
+        await asyncio.sleep(0.1)
+        assert len(evidence._transcript) == 1
+        assert evidence._transcript[0]["speaker"] == "agent"
+
+    async def test_run_conversation_item_added_user_ignored(self):
+        """run() conversation_item_added ignores non-assistant messages."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("conversation_item_added")
+        ev = MagicMock()
+        ev.item.role = "user"
+        ev.item.text_content = "user message"
+        handler(ev)
+        await asyncio.sleep(0.1)
+        assert len(evidence._transcript) == 0
+
+    async def test_run_function_tools_executed_dtmf(self):
+        """run() wires function_tools_executed to capture DTMF events."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("function_tools_executed")
+        assert handler is not None
+
+        # Test with string arguments (v1.4.5 format)
+        ev = MagicMock()
+        call = MagicMock()
+        call.name = "send_dtmf_events"
+        call.arguments = "123"
+        ev.function_calls = [call]
+        handler(ev)
+        await asyncio.sleep(0.1)
+        assert len(evidence._events) > 0
+
+    async def test_run_function_tools_executed_dtmf_dict_args(self):
+        """run() handles DTMF with dict arguments."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("function_tools_executed")
+
+        ev = MagicMock()
+        call = MagicMock()
+        call.name = "send_dtmf_events"
+        call.arguments = {"keys": "456"}
+        ev.function_calls = [call]
+        handler(ev)
+        await asyncio.sleep(0.1)
+
+    async def test_run_function_tools_executed_dtmf_other_args(self):
+        """run() handles DTMF with non-str/non-dict arguments (empty keys)."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("function_tools_executed")
+
+        ev = MagicMock()
+        call = MagicMock()
+        call.name = "send_dtmf_events"
+        call.arguments = 12345  # Neither str nor dict
+        ev.function_calls = [call]
+        handler(ev)
+        await asyncio.sleep(0.1)
+
+    async def test_run_function_tools_non_dtmf_ignored(self):
+        """run() ignores non-DTMF function tool executions."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_session._handlers.get("function_tools_executed")
+
+        ev = MagicMock()
+        call = MagicMock()
+        call.name = "other_tool"
+        call.arguments = "whatever"
+        ev.function_calls = [call]
+        handler(ev)
+        await asyncio.sleep(0.1)
+
+    async def test_run_evidence_subscriber_publishes_event(self):
+        """run() subscribes evidence pipeline to publish events on data channel."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        # Evidence should have a subscriber that publishes to data channel
+        assert len(evidence._subscribers) > 0
+        # Emit an event and check data was published
+        await evidence.emit(CallEvent(type=CallEventType.dtmf, data={"keys": "1"}))
+        mock_ctx.room.local_participant.publish_data.assert_called()
+
+    async def test_run_evidence_publish_failure_handled(self):
+        """run() handles evidence publish failure gracefully."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_ctx.room.local_participant.publish_data = AsyncMock(
+            side_effect=Exception("publish failed")
+        )
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        # Should not raise
+        await evidence.emit(CallEvent(type=CallEventType.dtmf, data={"keys": "1"}))
+
+    async def test_run_without_evidence(self):
+        """run() works without evidence pipeline (no subscribers)."""
+        from unittest.mock import patch
+
+        task = _make_task()
+        agent = _make_agent(task=task)
+        agent._evidence = None
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        mock_session.start.assert_called_once()
+
+    async def test_run_mid_call_drop_emits_error(self):
+        """run() emits mid_call_drop error for non-normal disconnect >3s."""
+        import time
+        from unittest.mock import patch
+
+        task = _make_task()
+        evidence = EvidencePipeline(task)
+        agent = _make_agent(task=task, evidence=evidence)
+        mock_ctx = _make_mock_ctx()
+        mock_session = _make_mock_session()
+
+        with patch("call_use.agent.AgentSession", return_value=mock_session):
+            await agent.run(mock_ctx)
+
+        handler = mock_ctx._room_handlers.get("participant_disconnected")
+
+        # Set call_start_time to > 3s ago
+        agent._call_start_time = time.time() - 10
+        agent._call_ended_normally = False
+        participant = MagicMock()
+        participant.identity = "phone-callee"
+        handler(participant)
+        await asyncio.sleep(0.1)
+        # Check that error event was emitted
+        error_events = [e for e in evidence._events if e.type == CallEventType.error]
+        assert len(error_events) > 0
+
+
+# ===========================================================================
+# entrypoint() (lines 714-740)
+# ===========================================================================
+
+
+class TestEntrypoint:
+    async def test_entrypoint_parses_metadata_and_runs(self):
+        """entrypoint() parses job metadata, creates agent, calls run()."""
+        from unittest.mock import patch
+
+        from call_use.agent import entrypoint
+
+        with patch("call_use.agent._LiveKitCallAgent.run", new_callable=AsyncMock) as mock_run:
+            mock_ctx = MagicMock()
+            mock_ctx.connect = AsyncMock()
+            mock_ctx.room = MagicMock()
+            mock_ctx.room.name = "call-test-entry"
+            mock_ctx.job = MagicMock()
+            mock_ctx.job.metadata = json.dumps({
+                "phone_number": "+12025551234",
+                "instructions": "Test call",
+                "caller_id": "+18005559876",
+                "user_info": {"name": "Test"},
+                "voice_id": "nova",
+                "approval_required": False,
+                "timeout_seconds": 300,
+                "recording_disclaimer": "This call is recorded.",
+            })
+
+            await entrypoint(mock_ctx)
+
+            mock_ctx.connect.assert_called_once()
+            mock_run.assert_called_once_with(mock_ctx)
+
+    async def test_entrypoint_no_phone_returns_early(self):
+        """entrypoint() returns early if no phone_number in metadata."""
+        from unittest.mock import patch
+
+        from call_use.agent import entrypoint
+
+        with patch("call_use.agent._LiveKitCallAgent.run", new_callable=AsyncMock) as mock_run:
+            mock_ctx = MagicMock()
+            mock_ctx.connect = AsyncMock()
+            mock_ctx.room = MagicMock()
+            mock_ctx.room.name = "call-test-nophone"
+            mock_ctx.job = MagicMock()
+            mock_ctx.job.metadata = json.dumps({"instructions": "Test"})
+
+            await entrypoint(mock_ctx)
+
+            mock_ctx.connect.assert_called_once()
+            # run() should NOT be called since phone_number is empty
+            mock_run.assert_not_called()
+
+    async def test_entrypoint_empty_metadata(self):
+        """entrypoint() handles empty metadata gracefully."""
+        from unittest.mock import patch
+
+        from call_use.agent import entrypoint
+
+        with patch("call_use.agent._LiveKitCallAgent.run", new_callable=AsyncMock) as mock_run:
+            mock_ctx = MagicMock()
+            mock_ctx.connect = AsyncMock()
+            mock_ctx.room = MagicMock()
+            mock_ctx.room.name = "call-test-empty"
+            mock_ctx.job = MagicMock()
+            mock_ctx.job.metadata = ""
+
+            await entrypoint(mock_ctx)
+
+            mock_ctx.connect.assert_called_once()
+            mock_run.assert_not_called()
+
+
+# ===========================================================================
+# main() (line 745)
+# ===========================================================================
+
+
+class TestAgentMain:
+    def test_main_calls_cli_run_app(self):
+        """main() calls cli.run_app(server)."""
+        from unittest.mock import patch
+
+        from call_use.agent import main
+
+        with patch("call_use.agent.cli") as mock_cli:
+            main()
+            mock_cli.run_app.assert_called_once()

@@ -64,10 +64,28 @@ class FakeAgent:
         return self._session
 
 
+class FakeAgentServer:
+    """Minimal stand-in for livekit.agents.AgentServer.
+
+    Provides rtc_session as a pass-through decorator so the original
+    function body is preserved and can be tested directly.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def rtc_session(self, **kwargs):
+        """Pass-through decorator that preserves the original function."""
+        def decorator(fn):
+            return fn
+        return decorator
+
+
 def _setup_agent_mocks():
     """Install agent-specific mocks. Called at module level."""
     _livekit_agents_mock = MagicMock()
     _livekit_agents_mock.Agent = FakeAgent
+    _livekit_agents_mock.AgentServer = FakeAgentServer
     # function_tool must be callable -- return identity for non-decorator usage,
     # and also work as @function_tool decorator.
     _livekit_agents_mock.function_tool = lambda fn=None, **kw: fn if fn else (lambda f: f)

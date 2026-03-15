@@ -1,13 +1,53 @@
-"""Tests for call-use CLI."""
+"""Tests for call-use CLI and __init__ lazy imports."""
 
+import asyncio
 import json
 import os
-from unittest.mock import patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import click
 from click.testing import CliRunner
 
 from call_use.cli import main
+
+
+# ===========================================================================
+# __init__.py lazy imports (lines 41-45)
+# ===========================================================================
+
+
+class TestLazyImports:
+    def test_mcp_server_lazy_import(self):
+        """Accessing call_use.mcp_server triggers lazy import (lines 41-44)."""
+        import call_use
+
+        # Call __getattr__ directly to test the mcp_server branch
+        result = call_use.__getattr__("mcp_server")
+        assert result is not None
+
+    def test_create_app_lazy_import(self):
+        """Accessing call_use.create_app triggers lazy import."""
+        import call_use
+
+        if "create_app" in call_use.__dict__:
+            saved = call_use.__dict__.pop("create_app")
+        else:
+            saved = None
+        try:
+            create_app = call_use.create_app
+            assert callable(create_app)
+        finally:
+            if saved is not None:
+                call_use.__dict__["create_app"] = saved
+
+    def test_nonexistent_attr_raises(self):
+        """Accessing a nonexistent attribute raises AttributeError (line 45)."""
+        import call_use
+
+        import pytest
+
+        with pytest.raises(AttributeError, match="no attribute"):
+            _ = call_use.nonexistent_thing
 
 
 def _extract_json(output: str) -> dict:
@@ -264,29 +304,36 @@ class TestEventPrinter:
 
 class TestStdinApprovalHandler:
     def test_approve_returns_approved(self):
+        """_stdin_approval_handler returns 'approved' when user enters 'y'."""
         from call_use.cli import _stdin_approval_handler
 
-        runner = CliRunner()
-        with runner.isolated_filesystem():
-            # Use Click's testing to simulate stdin input
-            result = runner.invoke(
-                click.BaseCommand("test", callback=lambda: None),
-                input="y\n",
-                catch_exceptions=False,
-            )
-        # Can't easily test _stdin_approval_handler in isolation since it uses
-        # click.prompt, so we test it via integration with known input
+        with patch("call_use.cli.click.prompt", return_value="y"):
+            result = _stdin_approval_handler({"details": "Refund of $50"})
+        assert result == "approved"
 
-    def test_handler_with_dict_data(self):
-        """_stdin_approval_handler extracts details from dict data."""
+    def test_reject_returns_rejected(self):
+        """_stdin_approval_handler returns 'rejected' when user enters 'n'."""
         from call_use.cli import _stdin_approval_handler
 
-        # We can't easily mock click.prompt, but we can test the logic
-        # by verifying it handles dict data without crashing
-        data = {"details": "Accept $100 offer", "approval_id": "apr-1"}
-        # The actual prompt would block, so we just verify the dict handling
-        # is correct by checking the function exists and accepts dict
-        assert callable(_stdin_approval_handler)
+        with patch("call_use.cli.click.prompt", return_value="n"):
+            result = _stdin_approval_handler({"details": "Expensive thing"})
+        assert result == "rejected"
+
+    def test_handler_with_non_dict_data(self):
+        """_stdin_approval_handler handles non-dict data by converting to str."""
+        from call_use.cli import _stdin_approval_handler
+
+        with patch("call_use.cli.click.prompt", return_value="y"):
+            result = _stdin_approval_handler("plain string data")
+        assert result == "approved"
+
+    def test_handler_dict_without_details(self):
+        """_stdin_approval_handler falls back to str(data) when no 'details' key."""
+        from call_use.cli import _stdin_approval_handler
+
+        with patch("call_use.cli.click.prompt", return_value="n"):
+            result = _stdin_approval_handler({"other_key": "value"})
+        assert result == "rejected"
 
 
 # ===========================================================================
@@ -322,3 +369,63 @@ def test_dial_generic_exception_exits_1(mock_run):
     result = runner.invoke(main, ["dial", "+18005551234", "-i", "test"])
     assert result.exit_code == 1
     assert "Unexpected error" in result.output
+
+
+# ===========================================================================
+# _run_call (lines 62-84)
+# ===========================================================================
+
+
+class TestRunCall:
+    @patch("call_use.cli.asyncio.run")
+    @patch("call_use.cli._check_env")
+    @patch("call_use.cli.load_dotenv", create=True)
+    def test_run_call_basic(self, mock_dotenv, mock_check, mock_async_run):
+        """_run_call creates CallAgent and calls asyncio.run."""
+        from call_use.cli import _run_call
+
+        mock_outcome = MagicMock()
+        mock_outcome.model_dump.return_value = {
+            "task_id": "test-1",
+            "disposition": "completed",
+            "duration_seconds": 10.0,
+            "transcript": [],
+            "events": [],
+        }
+        mock_async_run.return_value = mock_outcome
+
+        with patch("call_use.sdk.CallAgent") as MockAgent:
+            MockAgent.return_value.call = AsyncMock(return_value=mock_outcome)
+            # _run_call imports CallAgent inside, so we need to patch at import target
+            with patch("call_use.cli.CallAgent", MockAgent, create=True):
+                result = _run_call(
+                    phone="+12025551234",
+                    instructions="Test call",
+                    approval_required=False,
+                )
+
+        assert result == mock_outcome.model_dump.return_value
+
+    @patch("call_use.cli.asyncio.run")
+    @patch("call_use.cli._check_env")
+    @patch("call_use.cli.load_dotenv", create=True)
+    def test_run_call_with_approval(self, mock_dotenv, mock_check, mock_async_run):
+        """_run_call passes on_approval when approval_required=True."""
+        from call_use.cli import _run_call
+
+        mock_outcome = MagicMock()
+        mock_outcome.model_dump.return_value = {"disposition": "completed"}
+        mock_async_run.return_value = mock_outcome
+
+        with patch("call_use.sdk.CallAgent") as MockAgent:
+            MockAgent.return_value.call = AsyncMock(return_value=mock_outcome)
+            result = _run_call(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=True,
+            )
+
+        # Verify on_approval was passed
+        call_kwargs = MockAgent.call_args.kwargs
+        assert call_kwargs["approval_required"] is True
+        assert call_kwargs["on_approval"] is not None

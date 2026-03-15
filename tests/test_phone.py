@@ -70,3 +70,8 @@ class TestValidateCallerId:
     def test_invalid_caller_id_rejected(self):
         with pytest.raises(ValueError, match="Invalid caller_id"):
             validate_caller_id("invalid")
+
+    def test_non_string_caller_id_rejected(self):
+        """validate_caller_id raises ValueError for non-string input."""
+        with pytest.raises(ValueError, match="caller_id must be a string"):
+            validate_caller_id(12125551234)  # type: ignore[arg-type]

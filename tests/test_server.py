@@ -569,8 +569,6 @@ class TestRejectEndpoint:
 class TestServerHelpers:
     def test_get_call_lock_creates_lock(self, client, headers):
         """_get_call_lock creates and reuses locks per call_id."""
-        # This is tested implicitly through endpoints, but we verify
-        # inject to unknown call returns 404
         resp = client.post(
             "/calls/unknown-id/inject",
             json={"message": "test"},
@@ -590,3 +588,173 @@ class TestServerHelpers:
             headers=headers,
         )
         assert resp.status_code == 400
+
+
+# ===========================================================================
+# Edge cases for _get_agent_identity / _get_room_state (lines 76, 80, 86)
+# ===========================================================================
+
+
+class TestGetAgentIdentityEdgeCases:
+    def test_inject_room_not_found_returns_404(self, client, headers):
+        """inject returns 404 when room not found (line 76)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        # Room not found
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+        resp = client.post(
+            f"/calls/{task_id}/inject",
+            json={"message": "test"},
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
+    def test_inject_agent_not_initialized_returns_409(self, client, headers):
+        """inject returns 409 when agent not yet initialized (line 80)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        no_agent_room = MagicMock()
+        no_agent_room.metadata = '{"state": "created"}'
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_agent_room]))
+        resp = client.post(
+            f"/calls/{task_id}/inject",
+            json={"message": "test"},
+            headers=headers,
+        )
+        assert resp.status_code == 409
+
+    def test_get_call_room_not_found_returns_404(self, client, headers):
+        """GET /calls/{id} returns 404 when room not found (line 86)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+        resp = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# Takeover room closed (line 226)
+# ===========================================================================
+
+
+class TestTakeoverRoomClosed:
+    def test_takeover_room_closed_returns_404(self, client, headers):
+        """takeover returns 404 when room closes during polling (line 226)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        # First call for _get_agent_identity returns room, then polling returns empty
+        lkapi.room.list_rooms = AsyncMock(
+            side_effect=[
+                MagicMock(rooms=[mock_room]),  # _get_agent_identity
+                MagicMock(rooms=[]),            # polling - room closed
+            ]
+        )
+        resp = client.post(f"/calls/{task_id}/takeover", headers=headers)
+        assert resp.status_code == 404
+
+
+# ===========================================================================
+# Resume room closed (line 273) and timeout (line 278)
+# ===========================================================================
+
+
+class TestResumeEdgeCases:
+    def test_resume_room_closed_returns_404(self, client, headers):
+        """resume returns 404 when room closes during polling (line 273)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        takeover_room = MagicMock()
+        takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
+        lkapi.room.list_rooms = AsyncMock(
+            side_effect=[
+                MagicMock(rooms=[takeover_room]),  # _get_agent_identity
+                MagicMock(rooms=[takeover_room]),  # _get_room_state
+                MagicMock(rooms=[]),                # polling - room closed
+            ]
+        )
+        resp = client.post(
+            f"/calls/{task_id}/resume",
+            json={"summary": "test"},
+            headers=headers,
+        )
+        assert resp.status_code == 404
+
+    def test_resume_timeout_returns_504(self, client, headers):
+        """resume returns 504 when agent doesn't ack (line 278)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        takeover_room = MagicMock()
+        takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
+        # Never transitions to connected
+        lkapi.room.list_rooms = AsyncMock(
+            return_value=MagicMock(rooms=[takeover_room])
+        )
+        resp = client.post(
+            f"/calls/{task_id}/resume",
+            json={"summary": "test"},
+            headers=headers,
+        )
+        assert resp.status_code == 504
+
+    def test_resume_update_participant_fails_silently(self, client, headers):
+        """resume swallows update_participant exception (lines 292-293)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        takeover_room = MagicMock()
+        takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
+        connected_room = MagicMock()
+        connected_room.metadata = '{"state": "connected", "agent_identity": "agent-test123"}'
+        lkapi.room.list_rooms = AsyncMock(
+            side_effect=[
+                MagicMock(rooms=[takeover_room]),  # _get_agent_identity
+                MagicMock(rooms=[takeover_room]),  # _get_room_state
+                MagicMock(rooms=[connected_room]),  # polling
+            ]
+        )
+        lkapi.room.update_participant = AsyncMock(side_effect=Exception("participant gone"))
+        resp = client.post(
+            f"/calls/{task_id}/resume",
+            json={"summary": "test"},
+            headers=headers,
+        )
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "ai_resumed"
+
+
+# ===========================================================================
+# Approve endpoint edge cases (lines 302, 306)
+# ===========================================================================
+
+
+class TestApproveEdgeCases:
+    def test_approve_room_not_found_returns_404(self, client, headers):
+        """approve returns 404 when room not found (line 302)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+        resp = client.post(f"/calls/{task_id}/approve", headers=headers)
+        assert resp.status_code == 404
+
+    def test_approve_no_agent_returns_409(self, client, headers):
+        """approve returns 409 when agent not initialized (line 306)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        no_agent_room = MagicMock()
+        no_agent_room.metadata = '{"state": "created"}'
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_agent_room]))
+        resp = client.post(f"/calls/{task_id}/approve", headers=headers)
+        assert resp.status_code == 409
+
+
+# ===========================================================================
+# Reject endpoint edge cases (lines 329, 336)
+# ===========================================================================
+
+
+class TestRejectEdgeCases:
+    def test_reject_room_not_found_returns_404(self, client, headers):
+        """reject returns 404 when room not found (line 329)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+        resp = client.post(f"/calls/{task_id}/reject", headers=headers)
+        assert resp.status_code == 404
+
+    def test_reject_no_pending_approval_returns_409(self, client, headers):
+        """reject returns 409 when no pending approval (line 336)."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        no_approval_room = MagicMock()
+        no_approval_room.metadata = '{"agent_identity": "agent-test123", "state": "connected"}'
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[no_approval_room]))
+        resp = client.post(f"/calls/{task_id}/reject", headers=headers)
+        assert resp.status_code == 409
