@@ -1,11 +1,14 @@
 """call-use agent -- outbound call-control agent built on LiveKit Agents v1.4."""
 
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
 import time
 import uuid
+from typing import Any
 
 from dotenv import load_dotenv
 from livekit import api, rtc
@@ -176,7 +179,7 @@ class _LiveKitCallAgent(Agent):
         task: CallTask,
         evidence: EvidencePipeline | None = None,
     ):
-        tools = [send_dtmf_events]
+        tools: list[Any] = [send_dtmf_events]
         if task.approval_required:
             tools.append(
                 function_tool(
@@ -185,7 +188,7 @@ class _LiveKitCallAgent(Agent):
                 )
             )
         instructions = _build_instructions(task)
-        super().__init__(instructions=instructions, tools=tools)
+        super().__init__(instructions=instructions, tools=tools)  # type: ignore[arg-type]
 
         self._task = task
         self._evidence = evidence
@@ -205,8 +208,8 @@ class _LiveKitCallAgent(Agent):
         self._approval_id: str | None = None
 
         # LiveKit handles (set in run() -- Step 5b)
-        self._room = None
-        self._lk_api = None
+        self._room: Any = None
+        self._lk_api: Any = None
 
     # ---- Lifecycle hooks ----
 
@@ -542,7 +545,7 @@ class _LiveKitCallAgent(Agent):
 
         VALID_VOICES = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
         tts_voice = task.voice_id if task.voice_id in VALID_VOICES else "alloy"
-        session = AgentSession(
+        session: Any = AgentSession(
             stt=deepgram.STT(model="nova-3", language="en-US"),
             llm=openai.LLM(model="gpt-4o"),
             tts=openai.TTS(model="gpt-4o-mini-tts", voice=tts_voice),
