@@ -1,37 +1,12 @@
-"""Tests for call_use.server — Step 6."""
+"""Tests for call_use.server."""
 
-# LiveKit base mocks are set up in conftest.py (shared across all test files).
+# LiveKit mocks (base + server-specific) are set up in conftest.py.
 
+import os
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-
-# We need to mock LiveKitAPI as an async context manager
-mock_livekit_api = MagicMock()
-mock_lkapi_instance = MagicMock()
-mock_lkapi_instance.__aenter__ = AsyncMock(return_value=mock_lkapi_instance)
-mock_lkapi_instance.__aexit__ = AsyncMock(return_value=None)
-mock_livekit_api.return_value = mock_lkapi_instance
-
-# Mock agent_dispatch.create_dispatch
-mock_lkapi_instance.agent_dispatch = MagicMock()
-mock_lkapi_instance.agent_dispatch.create_dispatch = AsyncMock()
-
-# Set LiveKitAPI in livekit.api module
-sys.modules["livekit.api"].LiveKitAPI = mock_livekit_api
-
-# Mock api module attributes needed
-lk_api_mod = sys.modules["livekit"].api
-lk_api_mod.AccessToken = MagicMock
-lk_api_mod.VideoGrants = MagicMock
-lk_api_mod.CreateAgentDispatchRequest = MagicMock
-lk_api_mod.ListRoomsRequest = MagicMock
-lk_api_mod.ListParticipantsRequest = MagicMock
-lk_api_mod.SendDataRequest = MagicMock
-lk_api_mod.UpdateRoomMetadataRequest = MagicMock
-
-import os  # noqa: E402
 
 os.environ.setdefault("LIVEKIT_API_KEY", "test-key")
 os.environ.setdefault("LIVEKIT_API_SECRET", "test-secret")
@@ -195,9 +170,10 @@ class TestGetCallKnown:
         mock_room.metadata = '{"state": "connected"}'
         mock_participant = MagicMock()
         mock_participant.identity = "phone-callee"
-        mock_lkapi_instance.room = MagicMock()
-        mock_lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
-        mock_lkapi_instance.room.list_participants = AsyncMock(
+        lkapi_instance = sys.modules["livekit.api"].LiveKitAPI.return_value
+        lkapi_instance.room = MagicMock()
+        lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+        lkapi_instance.room.list_participants = AsyncMock(
             return_value=MagicMock(participants=[mock_participant])
         )
 

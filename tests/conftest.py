@@ -9,7 +9,7 @@ mocks are in place when test modules do their own top-level imports.
 """
 
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 # ---------------------------------------------------------------------------
 # Common livekit module mocks (shared across all test files)
@@ -80,3 +80,33 @@ def _setup_agent_mocks():
 
 
 _setup_agent_mocks()
+
+
+# ---------------------------------------------------------------------------
+# Server-specific mocks (needed by test_server.py)
+# ---------------------------------------------------------------------------
+
+def _setup_server_mocks():
+    """Install server-specific mocks on top of the base livekit mocks."""
+    mock_livekit_api = MagicMock()
+    mock_lkapi_instance = MagicMock()
+    mock_lkapi_instance.__aenter__ = AsyncMock(return_value=mock_lkapi_instance)
+    mock_lkapi_instance.__aexit__ = AsyncMock(return_value=None)
+    mock_livekit_api.return_value = mock_lkapi_instance
+
+    mock_lkapi_instance.agent_dispatch = MagicMock()
+    mock_lkapi_instance.agent_dispatch.create_dispatch = AsyncMock()
+
+    sys.modules["livekit.api"].LiveKitAPI = mock_livekit_api
+
+    lk_api_mod = sys.modules["livekit"].api
+    lk_api_mod.AccessToken = MagicMock
+    lk_api_mod.VideoGrants = MagicMock
+    lk_api_mod.CreateAgentDispatchRequest = MagicMock
+    lk_api_mod.ListRoomsRequest = MagicMock
+    lk_api_mod.ListParticipantsRequest = MagicMock
+    lk_api_mod.SendDataRequest = MagicMock
+    lk_api_mod.UpdateRoomMetadataRequest = MagicMock
+
+
+_setup_server_mocks()
