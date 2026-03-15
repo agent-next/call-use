@@ -307,54 +307,47 @@ class TestCallAgentCallMethod:
 
     async def test_call_timeout_returns_timeout_disposition(self):
         """call() returns timeout disposition when no complete event."""
-        import call_use.sdk as sdk_mod
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            timeout_seconds=0,  # Immediate timeout
+        )
 
-        original_timeout = sdk_mod.WORKER_JOIN_TIMEOUT
-        sdk_mod.WORKER_JOIN_TIMEOUT = 0.1
+        mock_room = MagicMock()
+        _handlers = {}
+        mock_room.on = lambda event_name: (lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1])
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
 
-        try:
-            agent = CallAgent(
-                phone="+12025551234",
-                instructions="Test call",
-                approval_required=False,
-                timeout_seconds=0,  # Immediate timeout
-            )
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+        # Fallback room listing returns no rooms
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
 
-            mock_room = MagicMock()
-            _handlers = {}
-            mock_room.on = lambda event_name: (lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1])
-            mock_room.connect = AsyncMock()
-            mock_room.disconnect = AsyncMock()
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            mock_lkapi = AsyncMock()
-            mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
-            # Fallback room listing returns no rooms
-            mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
-
-            with (
-                patch("call_use.sdk.rtc.Room", return_value=mock_room),
-                patch("call_use.sdk.api.AccessToken") as MockToken,
-                patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-                patch.dict(
-                    os.environ,
-                    {
-                        "LIVEKIT_API_KEY": "test-key",
-                        "LIVEKIT_API_SECRET": "test-secret",
-                        "LIVEKIT_URL": "wss://test",
-                    },
-                ),
-            ):
-                MockToken.return_value.to_jwt.return_value = "fake-jwt"
-                MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
-                MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
-
-                # With WORKER_JOIN_TIMEOUT=0.1 and no worker joining,
-                # this now raises CallError instead of returning timeout
-                with pytest.raises(CallError) as exc_info:
-                    await agent.call()
-                assert exc_info.value.code == CallErrorCode.worker_not_running
-        finally:
-            sdk_mod.WORKER_JOIN_TIMEOUT = original_timeout
+            # With WORKER_JOIN_TIMEOUT=0.1 and no worker joining,
+            # this now raises CallError instead of returning timeout
+            with pytest.raises(CallError) as exc_info:
+                await agent.call()
+            assert exc_info.value.code == CallErrorCode.worker_not_running
 
     async def test_call_ignores_non_call_events_topic(self):
         """call() data handler ignores packets with non-call-events topic."""
@@ -1017,138 +1010,123 @@ class TestTokenTTL:
 class TestWorkerNotRunningDetection:
     async def test_no_worker_raises_call_error(self):
         """When no worker joins within timeout, CallError is raised with helpful message."""
-        import call_use.sdk as sdk_mod
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+        )
 
-        original_timeout = sdk_mod.WORKER_JOIN_TIMEOUT
-        sdk_mod.WORKER_JOIN_TIMEOUT = 0.1  # Speed up test
+        mock_room = MagicMock()
+        handlers = {}
 
-        try:
-            agent = CallAgent(
-                phone="+12025551234",
-                instructions="Test call",
-                approval_required=False,
-            )
+        def capture_handler(event_name):
+            def decorator(fn):
+                handlers[event_name] = fn
+                return fn
 
-            mock_room = MagicMock()
-            handlers = {}
+            return decorator
 
-            def capture_handler(event_name):
-                def decorator(fn):
-                    handlers[event_name] = fn
-                    return fn
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
 
-                return decorator
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
 
-            mock_room.on = capture_handler
-            mock_room.connect = AsyncMock()
-            mock_room.disconnect = AsyncMock()
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            mock_lkapi = AsyncMock()
-            mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+            with pytest.raises(CallError) as exc_info:
+                await agent.call()
 
-            with (
-                patch("call_use.sdk.rtc.Room", return_value=mock_room),
-                patch("call_use.sdk.api.AccessToken") as MockToken,
-                patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-                patch.dict(
-                    os.environ,
-                    {
-                        "LIVEKIT_API_KEY": "test-key",
-                        "LIVEKIT_API_SECRET": "test-secret",
-                        "LIVEKIT_URL": "wss://test",
-                    },
-                ),
-            ):
-                MockToken.return_value.to_jwt.return_value = "fake-jwt"
-                MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
-                MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
-
-                with pytest.raises(CallError) as exc_info:
-                    await agent.call()
-
-                assert exc_info.value.code == CallErrorCode.worker_not_running
-                assert "call-use-worker start" in exc_info.value.message
-        finally:
-            sdk_mod.WORKER_JOIN_TIMEOUT = original_timeout
+            assert exc_info.value.code == CallErrorCode.worker_not_running
+            assert "call-use-worker start" in exc_info.value.message
 
     async def test_worker_joins_immediately_no_delay(self):
         """When worker joins quickly, no error and no added delay."""
-        import call_use.sdk as sdk_mod
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            on_event=lambda e: None,
+        )
 
-        original_timeout = sdk_mod.WORKER_JOIN_TIMEOUT
-        sdk_mod.WORKER_JOIN_TIMEOUT = 10  # Long timeout to prove it doesn't wait
+        mock_room = MagicMock()
+        handlers = {}
 
-        try:
-            agent = CallAgent(
-                phone="+12025551234",
-                instructions="Test call",
-                approval_required=False,
-                on_event=lambda e: None,
-            )
+        def capture_handler(event_name):
+            def decorator(fn):
+                handlers[event_name] = fn
+                return fn
 
-            mock_room = MagicMock()
-            handlers = {}
+            return decorator
 
-            def capture_handler(event_name):
-                def decorator(fn):
-                    handlers[event_name] = fn
-                    return fn
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
 
-                return decorator
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
 
-            mock_room.on = capture_handler
-            mock_room.connect = AsyncMock()
-            mock_room.disconnect = AsyncMock()
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 10),
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            mock_lkapi = AsyncMock()
-            mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+            async def _simulate_worker_and_complete():
+                await asyncio.sleep(0.02)
+                # Worker joins
+                if "participant_connected" in handlers:
+                    participant = MagicMock()
+                    participant.identity = "agent-abc123"
+                    handlers["participant_connected"](participant)
+                await asyncio.sleep(0.02)
+                # Call completes
+                if "data_received" in handlers:
+                    dp = MagicMock()
+                    dp.topic = "call-events"
+                    dp.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {
+                                "task_id": "test-fast",
+                                "transcript": [],
+                                "events": [],
+                                "duration_seconds": 5.0,
+                                "disposition": "completed",
+                            },
+                        }
+                    ).encode()
+                    handlers["data_received"](dp)
 
-            with (
-                patch("call_use.sdk.rtc.Room", return_value=mock_room),
-                patch("call_use.sdk.api.AccessToken") as MockToken,
-                patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-                patch.dict(
-                    os.environ,
-                    {
-                        "LIVEKIT_API_KEY": "test-key",
-                        "LIVEKIT_API_SECRET": "test-secret",
-                        "LIVEKIT_URL": "wss://test",
-                    },
-                ),
-            ):
-                MockToken.return_value.to_jwt.return_value = "fake-jwt"
-                MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
-                MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
-
-                async def _simulate_worker_and_complete():
-                    await asyncio.sleep(0.02)
-                    # Worker joins
-                    if "participant_connected" in handlers:
-                        participant = MagicMock()
-                        participant.identity = "agent-abc123"
-                        handlers["participant_connected"](participant)
-                    await asyncio.sleep(0.02)
-                    # Call completes
-                    if "data_received" in handlers:
-                        dp = MagicMock()
-                        dp.topic = "call-events"
-                        dp.data = json.dumps(
-                            {
-                                "type": "call_complete",
-                                "data": {
-                                    "task_id": "test-fast",
-                                    "transcript": [],
-                                    "events": [],
-                                    "duration_seconds": 5.0,
-                                    "disposition": "completed",
-                                },
-                            }
-                        ).encode()
-                        handlers["data_received"](dp)
-
-                asyncio.create_task(_simulate_worker_and_complete())
-                outcome = await agent.call()
-                assert outcome.disposition == "completed"
-        finally:
-            sdk_mod.WORKER_JOIN_TIMEOUT = original_timeout
-
+            asyncio.create_task(_simulate_worker_and_complete())
+            outcome = await agent.call()
+            assert outcome.disposition == "completed"
