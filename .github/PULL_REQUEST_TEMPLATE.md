@@ -1,9 +1,24 @@
 ## What
 
+Brief description of the change.
+
 ## Why
 
-## Test plan
+Why is this change needed?
 
-- [ ] Tests pass (`pytest tests/ -v`)
-- [ ] Lint passes (`ruff check call_use/`)
-- [ ] Format passes (`ruff format --check call_use/`)
+## How
+
+How was this implemented?
+
+## Test Plan
+
+- [ ] Tests added/updated
+- [ ] All tests pass (`make test`)
+- [ ] Lint passes (`make lint`)
+- [ ] Type check passes (`make typecheck`)
+
+## Checklist
+
+- [ ] Follows conventional commit format
+- [ ] Documentation updated (if applicable)
+- [ ] No secrets or credentials in code
