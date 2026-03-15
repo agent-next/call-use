@@ -160,6 +160,7 @@ async def test_do_dial_livekit_connection_error(MockLiveKitAPI):
     result_str = await dial(phone="+18005551234", instructions="test")
     result = json.loads(result_str)
     assert "error" in result
+    assert "refused" not in result_str  # Original error message must not leak
 
 
 @pytest.mark.asyncio
@@ -220,6 +221,7 @@ async def test_status_tool_wraps_exception(MockLiveKitAPI):
     result = json.loads(result_str)
     assert result["error"] == "Internal error. Check server logs for details."
     assert result["task_id"] == "call-fail"
+    assert "boom" not in result_str  # Original error message must not leak
 
 
 @pytest.mark.asyncio
@@ -235,6 +237,7 @@ async def test_result_tool_wraps_exception(MockLiveKitAPI):
     parsed = json.loads(result_str)
     assert parsed["error"] == "Internal error. Check server logs for details."
     assert parsed["task_id"] == "call-fail"
+    assert "boom" not in result_str  # Original error message must not leak
 
 
 @pytest.mark.asyncio
@@ -251,6 +254,7 @@ async def test_cancel_tool_wraps_exception(MockLiveKitAPI):
     result_str = await cancel(task_id="call-fail")
     parsed = json.loads(result_str)
     assert parsed["error"] == "Internal error. Check server logs for details."
+    assert "room gone" not in result_str  # Original error message must not leak
 
 
 @pytest.mark.asyncio

@@ -183,7 +183,7 @@ async def dial(
         )
         return json.dumps(result, indent=2)
     except Exception as e:
-        logger.error("dial tool error: %s", e, exc_info=True)
+        logger.error("dial tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details."})
 
 
@@ -198,7 +198,7 @@ async def status(task_id: str) -> str:
         result = await _do_status(task_id)
         return json.dumps(result, indent=2)
     except Exception as e:
-        logger.error("status tool error: %s", e, exc_info=True)
+        logger.error("status tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
@@ -221,7 +221,7 @@ async def cancel(task_id: str) -> str:
             )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})
     except Exception as e:
-        logger.error("cancel tool error: %s", e, exc_info=True)
+        logger.error("cancel tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
@@ -238,7 +238,7 @@ async def result(task_id: str) -> str:
         outcome = await _do_result(task_id)
         return json.dumps(outcome, indent=2)
     except Exception as e:
-        logger.error("result tool error: %s", e, exc_info=True)
+        logger.error("result tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
 
 
