@@ -583,6 +583,26 @@ class TestOnDataReceived:
         await agent._on_data_received(dp)
         agent.session.generate_reply.assert_called_once()
 
+    async def test_on_data_received_malformed_json_handled(self):
+        """Malformed JSON in data packet is logged and silently ignored."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        dp = MagicMock()
+        dp.topic = "backend-commands"
+        dp.data = b"not-valid-json{{"
+        # Should not raise
+        await agent._on_data_received(dp)
+
+    async def test_on_data_received_invalid_utf8_handled(self):
+        """Invalid UTF-8 bytes in data packet are logged and silently ignored."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        dp = MagicMock()
+        dp.topic = "backend-commands"
+        dp.data = b"\x80\x81\x82"
+        # Should not raise
+        await agent._on_data_received(dp)
+
     async def test_routes_approval_response(self):
         """approve/reject routes to _handle_approval_response."""
         agent = _make_agent()

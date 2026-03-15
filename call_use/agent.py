@@ -288,7 +288,11 @@ class _LiveKitCallAgent(Agent):
         """Route incoming commands from backend/SDK."""
         if data_packet.topic != "backend-commands":
             return
-        payload = json.loads(data_packet.data.decode("utf-8"))
+        try:
+            payload = json.loads(data_packet.data.decode("utf-8"))
+        except (json.JSONDecodeError, UnicodeDecodeError, Exception) as exc:
+            logger.warning("Malformed data packet, ignoring: %s", exc)
+            return
         cmd_type = payload.get("type")
 
         # Takeover bypasses _cmd_lock -- interrupt() is safe to call anytime.
