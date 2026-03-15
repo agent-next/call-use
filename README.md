@@ -6,9 +6,11 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-> **Early release (v0.1)** — Core functionality works. API may change before v1.0. [Report issues](https://github.com/agent-next/call-use/issues).
+**Give your AI agent the ability to make real phone calls.**
 
-**Give your AI agent the ability to make phone calls.**
+call-use is an open-source outbound call-control runtime that lets AI agents dial real phones, navigate IVR menus, talk to humans, and return structured results. Think *browser-use*, but for phone calls.
+
+> **Early release (v0.1)** — Core functionality works. API may change before v1.0. [Report issues](https://github.com/agent-next/call-use/issues).
 
 <div align="center">
 
@@ -22,67 +24,67 @@ from call_use import CallAgent
 outcome = await CallAgent(
     phone="+18001234567",
     instructions="Cancel my internet subscription",
+    approval_required=False,
 ).call()
 
 print(outcome.disposition)   # "completed"
 print(outcome.transcript)    # [{speaker: "agent", text: "..."}, ...]
 ```
 
-Open-source. Self-hostable. Works with any agent framework.
-
----
-
 ## Features
 
-**4 interfaces** — use whichever fits your stack:
+- **Four interfaces** — Python SDK, CLI, MCP server, and REST API. Use whichever fits your stack.
+- **IVR navigation** — Navigate phone menus, press DTMF buttons, handle hold music automatically.
+- **Human takeover** — Pause the AI mid-call, join as a human, then hand control back to the agent.
+- **Approval flow** — Agent pauses and asks permission before taking sensitive actions.
+- **Structured outcomes** — Every call returns typed results: transcript, events, disposition, duration.
+- **Phone validation** — E.164 format enforcement, premium-rate blocking, Caribbean NPA blocking.
+- **Framework integrations** — Works with [LangChain](examples/langchain_tool.py), [CrewAI](examples/crewai_integration.py), [OpenAI Agents](examples/openai_agents.py), and any MCP-compatible client.
+- **Rate limiting** — Built-in per-key sliding window for the REST API.
 
-```bash
-# Python SDK
-outcome = await CallAgent(phone="+18001234567", instructions="...").call()
-
-# CLI — any agent that runs bash can make calls
-call-use dial "+18001234567" -i "Ask about store hours"
-
-# MCP Server — native Claude Code / Codex integration
-call-use-mcp  # stdio transport, 4 async tools
-
-# REST API — multi-tenant deployments
-curl -X POST localhost:8000/calls -H "X-API-Key: ..." -d '{"phone_number": "+18001234567"}'
-```
-
-**Built-in capabilities:**
-
-| | |
-|---|---|
-| **IVR navigation** | Navigate phone menus, press buttons, handle hold music |
-| **Human takeover** | Pause the agent mid-call, join as a human, hand back |
-| **Approval flow** | Agent asks for permission before sensitive actions |
-| **Structured outcomes** | Transcript, events, disposition, duration — all typed |
-| **Phone validation** | Premium-rate blocking, Caribbean NPA blocking, E.164 |
-| **Rate limiting** | Per-key sliding window for REST API |
-
-## Quick start
+## Installation
 
 ```bash
 pip install call-use
 ```
 
-Configure environment ([full guide](https://docs.call-use.com/getting-started/configuration/)):
+## Quick Start
 
-```bash
-export LIVEKIT_URL="wss://..."          # LiveKit Cloud or self-hosted
-export LIVEKIT_API_KEY="..."
-export LIVEKIT_API_SECRET="..."
-export SIP_TRUNK_ID="..."               # Twilio SIP trunk in LiveKit
-export DEEPGRAM_API_KEY="..."           # STT
-export OPENAI_API_KEY="..."             # LLM + TTS
-```
+### Prerequisites
 
-Start the worker, then make a call:
+call-use connects four external services into a voice AI pipeline:
+
+| Service | Purpose | Sign up |
+|---------|---------|---------|
+| [LiveKit](https://livekit.io/) | Real-time audio transport + agent dispatch | [Cloud](https://cloud.livekit.io/) or self-hosted |
+| [Twilio](https://www.twilio.com/) | SIP trunk for PSTN connectivity | [Console](https://console.twilio.com/) |
+| [Deepgram](https://deepgram.com/) | Speech-to-text | [Console](https://console.deepgram.com/) |
+| [OpenAI](https://openai.com/) | LLM (GPT-4o) + text-to-speech | [Platform](https://platform.openai.com/) |
+
+### Configuration
+
+Set these environment variables (or use a `.env` file):
+
+| Variable | Description |
+|----------|-------------|
+| `LIVEKIT_URL` | LiveKit server URL (`wss://...`) |
+| `LIVEKIT_API_KEY` | LiveKit API key |
+| `LIVEKIT_API_SECRET` | LiveKit API secret |
+| `SIP_TRUNK_ID` | Twilio SIP trunk ID configured in LiveKit |
+| `DEEPGRAM_API_KEY` | Deepgram API key for STT |
+| `OPENAI_API_KEY` | OpenAI API key for LLM + TTS |
+
+### Start the worker
+
+The worker process handles the actual voice pipeline:
 
 ```bash
 call-use-worker start
 ```
+
+### Make a call
+
+**Python SDK:**
 
 ```python
 import asyncio
@@ -102,32 +104,15 @@ async def main():
 asyncio.run(main())
 ```
 
-## Human takeover
+**CLI** — any agent that can run shell commands can make calls:
 
-Pause the AI, join the call yourself, then hand back:
-
-```python
-token = await agent.takeover()   # returns LiveKit JWT
-# ... join room with token, talk to callee ...
-await agent.resume()             # agent takes over again
+```bash
+call-use dial "+18001234567" -i "Ask about store hours"
 ```
 
-## Approval flow
+Events stream to stderr in real-time; structured JSON result goes to stdout.
 
-Agent pauses and asks before sensitive actions:
-
-```python
-agent = CallAgent(
-    phone="+18001234567",
-    instructions="Cancel my subscription. If they offer a discount, ask me first.",
-    approval_required=True,
-    on_approval=lambda data: input(f"Approve '{data['details']}'? [y/n]: "),
-)
-```
-
-## MCP Server
-
-Native tool integration for Claude Code, Codex, and other MCP-compatible agents:
+**MCP Server** — native integration for Claude Code, Codex, and other MCP clients:
 
 ```json
 {
@@ -146,9 +131,56 @@ Native tool integration for Claude Code, Codex, and other MCP-compatible agents:
 }
 ```
 
-4 async tools: `dial` (returns immediately), `status`, `cancel`, `result`.
+Exposes four async tools: `dial` (returns immediately), `status`, `cancel`, `result`.
+
+## Architecture
+
+```
+┌──────────┐         ┌──────────────┐         ┌────────────┐         ┌──────┐
+│ Your Code│────────▶│ LiveKit Cloud│────────▶│ Twilio SIP │────────▶│ PSTN │
+│ (SDK/CLI)│  gRPC   │              │  agent  │            │  SIP    │      │
+└──────────┘         │  Room + Data │  dispatch            │         │ ☎    │
+                     │   Channels   │         └────────────┘         └──────┘
+                     └──────┬───────┘
+                            │
+                     ┌──────┴───────┐
+                     │ call-use     │
+                     │ worker       │
+                     │              │
+                     │ Deepgram STT │
+                     │ GPT-4o LLM   │
+                     │ OpenAI TTS   │
+                     └──────────────┘
+```
+
+**Two processes:** your code dispatches a call task into a LiveKit room; the worker joins the room, dials via SIP, runs the voice conversation, and publishes the structured outcome.
+
+## Human Takeover
+
+Pause the AI agent, join the call yourself, then hand control back:
+
+```python
+token = await agent.takeover()   # returns LiveKit JWT
+# ... join the room with the token, talk to the callee ...
+await agent.resume()             # agent takes over again
+```
+
+## Approval Flow
+
+The agent pauses and asks before taking sensitive actions:
+
+```python
+agent = CallAgent(
+    phone="+18001234567",
+    instructions="Cancel my subscription. If they offer a discount, ask me first.",
+    approval_required=True,
+    on_approval=lambda data: input(f"Approve '{data['details']}'? [y/n]: "),
+)
+```
 
 ## REST API
+
+For multi-tenant deployments:
 
 ```python
 from call_use import create_app
@@ -158,27 +190,16 @@ app = create_app(api_key="your-secret-key")
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/calls` | Create outbound call |
-| GET | `/calls/{id}` | Get status |
-| POST | `/calls/{id}/inject` | Inject message into call |
-| POST | `/calls/{id}/takeover` | Human takeover |
-| POST | `/calls/{id}/resume` | Resume agent |
-| POST | `/calls/{id}/approve` | Approve pending action |
-| POST | `/calls/{id}/reject` | Reject pending action |
-| POST | `/calls/{id}/cancel` | Cancel call |
+| `POST` | `/calls` | Create outbound call |
+| `GET` | `/calls/{id}` | Get call status |
+| `POST` | `/calls/{id}/inject` | Inject context into active call |
+| `POST` | `/calls/{id}/takeover` | Human takeover |
+| `POST` | `/calls/{id}/resume` | Resume AI agent |
+| `POST` | `/calls/{id}/approve` | Approve pending action |
+| `POST` | `/calls/{id}/reject` | Reject pending action |
+| `POST` | `/calls/{id}/cancel` | Cancel call |
 
-All endpoints require `X-API-Key` header.
-
-## Architecture
-
-```
-Your code ──▶ LiveKit Cloud ──▶ Twilio SIP ──▶ PSTN
-                    │
-              call-use worker
-              (Deepgram STT + GPT-4o + OpenAI TTS)
-```
-
-Two processes: your code dispatches an agent into a LiveKit room; the worker joins, dials via SIP, runs the conversation, publishes the outcome.
+All endpoints require an `X-API-Key` header.
 
 ## Examples
 
@@ -187,7 +208,7 @@ Two processes: your code dispatches an agent into a LiveKit room; the worker joi
 | [Customer service refund](examples/cs_refund_agent.py) | End-to-end refund automation |
 | [Appointment scheduler](examples/appointment_scheduler.py) | Navigate IVR, book appointment |
 | [Insurance claim](examples/insurance_claim.py) | File claim, capture claim number |
-| [Subscription cancellation](examples/subscription_cancellation.py) | Handle retention offers via approval |
+| [Subscription cancellation](examples/subscription_cancellation.py) | Handle retention offers via approval flow |
 | [Multi-call workflow](examples/multi_call_workflow.py) | Chain sequential calls |
 | [Webhook integration](examples/webhook_integration.py) | FastAPI + WebSocket events |
 | [LangChain tool](examples/langchain_tool.py) | Use as a LangChain tool |
@@ -197,7 +218,7 @@ Two processes: your code dispatches an agent into a LiveKit room; the worker joi
 
 ## Documentation
 
-Full docs at [docs.call-use.com](https://docs.call-use.com) — getting started, guides, API reference, architecture.
+Full documentation at [docs.call-use.com](https://docs.call-use.com) — getting started, guides, API reference, and architecture deep-dive.
 
 ## Contributing
 
@@ -212,10 +233,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 ## Known Limitations
 
-- **In-memory state** — REST API call state lost on restart
-- **Caller ID** — Format validation only; ownership verification planned for v0.2
-- **Single worker** — Horizontal scaling requires shared state backend
-- **US/Canada only** — Outbound PSTN via Twilio SIP; international and inbound planned
+- **In-memory state** — REST API call state is lost on restart; use LiveKit room metadata for recovery.
+- **Single worker** — Horizontal scaling requires a shared state backend.
+- **US/Canada only** — Outbound PSTN via Twilio SIP; international and inbound calling are planned.
 
 ## Legal Notice
 
@@ -223,4 +243,4 @@ call-use is a developer tool for legitimate business automation. Users are solel
 
 ## License
 
-MIT
+[MIT](LICENSE)
