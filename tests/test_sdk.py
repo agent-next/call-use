@@ -15,6 +15,13 @@ from call_use.sdk import CallAgent
 pytestmark = pytest.mark.unit
 
 
+async def _selective_timeout(coro, timeout):
+    """Only raise TimeoutError for the call timeout (>= 60s), not other wait_for calls."""
+    if timeout >= 60:  # call timeout = timeout_seconds + 30, minimum 60
+        raise asyncio.TimeoutError()
+    return await asyncio.wait_for(coro, timeout)
+
+
 class TestCallAgentConstructor:
     def test_valid_inputs(self):
         agent = CallAgent(
@@ -361,14 +368,11 @@ class TestCallAgentCallMethod:
         # Fallback room listing returns no rooms
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
 
-        async def _immediate_timeout(coro, timeout):
-            raise asyncio.TimeoutError()
-
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_selective_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -387,10 +391,16 @@ class TestCallAgentCallMethod:
 
     async def test_call_ignores_non_call_events_topic(self):
         """call() data handler ignores packets with non-call-events topic (line 107)."""
+        events_received = []
+
+        def on_event(e):
+            events_received.append(e)
+
         agent = CallAgent(
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
+            on_event=on_event,
             timeout_seconds=30,
         )
 
@@ -413,14 +423,11 @@ class TestCallAgentCallMethod:
         mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
 
-        async def _immediate_timeout(coro, timeout):
-            raise asyncio.TimeoutError()
-
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_selective_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -434,8 +441,22 @@ class TestCallAgentCallMethod:
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
+            # Send a non-call-events packet before call times out
+            async def _send_other_topic():
+                await asyncio.sleep(0.05)
+                if data_handler:
+                    dp = MagicMock()
+                    dp.topic = "other-topic"
+                    dp.data = json.dumps(
+                        {"type": "transcript", "data": {"speaker": "agent", "text": "Hi"}}
+                    ).encode()
+                    data_handler(dp)
+
+            asyncio.create_task(_send_other_topic())
             outcome = await agent.call()
             assert outcome.disposition == "timeout"
+            # The non-call-events packet should have been ignored — no events fired
+            assert len(events_received) == 0
 
     async def test_call_on_event_callback_fires(self):
         """call() invokes on_event callback when data is received (covers line 107)."""
@@ -643,14 +664,11 @@ class TestCallAgentCallMethod:
         )
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_fallback_room]))
 
-        async def _immediate_timeout(coro, timeout):
-            raise asyncio.TimeoutError()
-
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_selective_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -698,14 +716,11 @@ class TestCallAgentCallMethod:
                 return dispatch_api
             return fallback_api
 
-        async def _immediate_timeout(coro, timeout):
-            raise asyncio.TimeoutError()
-
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
-            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_selective_timeout),
             patch.dict(
                 os.environ,
                 {
