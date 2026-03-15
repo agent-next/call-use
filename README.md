@@ -4,6 +4,7 @@
 [![Tests](https://github.com/agent-next/call-use/actions/workflows/ci.yml/badge.svg)](https://github.com/agent-next/call-use/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](https://github.com/agent-next/call-use/blob/main/LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
+[![Docs](https://img.shields.io/badge/docs-call--use.dev-blue)](https://call-use.dev)
 
 > **Give your AI agent the ability to make phone calls.** The [browser-use](https://github.com/browser-use/browser-use) for phones.
 
