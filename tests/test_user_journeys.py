@@ -93,16 +93,14 @@ class TestFirstTimeUser:
         ]:
             assert opt in result.output
 
-    def test_auth_help_shows_tiers(self):
-        """User runs 'call-use auth --help' — should see tier info."""
+    def test_auth_command_removed_for_v01(self):
+        """auth command removed for v0.1 — should not be registered."""
         from click.testing import CliRunner
 
         from call_use.cli import main
 
         result = CliRunner().invoke(main, ["auth", "--help"])
-        assert result.exit_code == 0
-        assert "--github" in result.output
-        assert "--phone" in result.output
+        assert result.exit_code != 0
 
 
 class TestUserErrors:
