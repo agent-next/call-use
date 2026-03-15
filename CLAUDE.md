@@ -1,7 +1,7 @@
 # call-use
 
 ## Project
-Open-source outbound call-control runtime for AI agents. The "browser-use" for phones.
+Open-source outbound call-control runtime for AI agents. Gives any AI agent the ability to make real phone calls.
 - **Stack**: LiveKit Agents v1.4 + Deepgram STT + OpenAI GPT-4o + GPT-4o-mini TTS + Twilio SIP
 - **Architecture**: FastAPI server (dispatch) + LiveKit agent worker (voice). Communication via LiveKit data channel + room metadata.
 
