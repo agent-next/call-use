@@ -28,6 +28,8 @@ from call_use.models import (
 )
 from call_use.phone import validate_phone_number  # noqa: E402
 
+pytestmark = pytest.mark.bdd
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------

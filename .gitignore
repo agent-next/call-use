@@ -35,3 +35,8 @@ logs/
 # LiveKit model files
 *.onnx
 __pycache__/
+
+# MkDocs
+site/
+.coverage
+.hypothesis/

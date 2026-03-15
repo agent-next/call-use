@@ -1,16 +1,22 @@
 # Changelog
 
-## [0.1.0] - 2026-03-14
+All notable changes to call-use will be documented in this file.
+
+## [0.1.0] — 2026-03-14
 
 ### Added
-- Python SDK: `CallAgent` class for programmatic outbound calls
-- CLI: `call-use dial` command for agent-native phone calls
-- MCP Server: 4 async tools (`dial`, `status`, `cancel`, `result`) for Claude Code / Codex
-- REST API: `create_app()` for multi-tenant deployments (8 endpoints)
-- LiveKit-based voice agent with GPT-4o + Deepgram Nova-3 STT + OpenAI TTS
-- Approval flow: agent pauses for human approval on sensitive actions
-- Human takeover: pause agent mid-call, take over the conversation
-- Phone validation: E.164 NANP format, blocks premium/Caribbean numbers
-- JSON audit logs per call
-- Agent skill: `skill.md` for Claude Code and compatible agent frameworks
-- Framework examples: LangChain, OpenAI Agents SDK, Claude Code MCP setup
+- **Python SDK** (`CallAgent`): async outbound call control with event streaming
+- **REST API** (FastAPI): 8 endpoints for call lifecycle management with API key auth
+- **CLI** (`call-use dial`): make calls from the terminal with real-time transcript streaming
+- **MCP Server**: 4 tools (dial, status, cancel, result) for Claude Code / AI agent integration
+- **IVR navigation**: DTMF tone generation, voicemail detection, hold/transfer handling
+- **Human takeover**: pause the AI agent, join the call, hand back control
+- **Approval flow**: agent pauses for human sign-off before sensitive actions
+- **Evidence pipeline**: structured transcript + event logs to `~/.call-use/logs/`
+- **Phone validation**: E.164 NANP format, premium-rate number blocking, Caribbean NPA blocking
+- **Rate limiting**: sliding-window per-API-key rate limiter for the REST API
+
+### Security
+- Premium-rate (900/976) and Caribbean number blocking
+- API key authentication for REST endpoints
+- Caller ID format validation (ownership verification planned for v0.2)

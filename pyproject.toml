@@ -36,7 +36,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-asyncio", "httpx"]
+dev = ["pytest", "pytest-asyncio", "pytest-cov", "httpx", "mypy", "hypothesis"]
+docs = [
+    "mkdocs-material>=9.0",
+    "mkdocstrings[python]>=0.24",
+]
 
 [project.scripts]
 call-use-worker = "call_use.agent:main"
@@ -60,6 +64,15 @@ call_use = ["py.typed"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+markers = [
+    "unit: Unit tests",
+    "bdd: Behavior-driven scenario tests",
+    "integration: Integration tests across modules",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
 
 [tool.ruff]
 target-version = "py311"
@@ -67,3 +80,9 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true

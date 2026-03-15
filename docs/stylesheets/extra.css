@@ -1,0 +1,478 @@
+/* ==========================================================================
+   call-use.com — Landing page styles
+   Works with mkdocs-material light + dark mode via CSS custom properties.
+   ========================================================================== */
+
+/* ---------- CSS Custom Properties ---------- */
+:root {
+  --cu-accent: #6366f1;
+  --cu-accent-light: #818cf8;
+  --cu-accent-dark: #4f46e5;
+  --cu-surface: #f8fafc;
+  --cu-surface-alt: #f1f5f9;
+  --cu-surface-card: #ffffff;
+  --cu-text: #0f172a;
+  --cu-text-muted: #64748b;
+  --cu-border: #e2e8f0;
+  --cu-gradient-start: #6366f1;
+  --cu-gradient-end: #a855f7;
+  --cu-code-bg: #1e1e2e;
+  --cu-shadow: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+  --cu-shadow-lg: 0 10px 25px rgba(0,0,0,.07), 0 4px 10px rgba(0,0,0,.04);
+  --cu-radius: 12px;
+}
+
+[data-md-color-scheme="slate"] {
+  --cu-surface: #0f172a;
+  --cu-surface-alt: #1e293b;
+  --cu-surface-card: #1e293b;
+  --cu-text: #f1f5f9;
+  --cu-text-muted: #94a3b8;
+  --cu-border: #334155;
+  --cu-code-bg: #0f172a;
+  --cu-shadow: 0 1px 3px rgba(0,0,0,.3), 0 1px 2px rgba(0,0,0,.2);
+  --cu-shadow-lg: 0 10px 25px rgba(0,0,0,.4), 0 4px 10px rgba(0,0,0,.2);
+}
+
+/* ---------- Landing page container ---------- */
+.cu-landing .md-content__inner {
+  max-width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.cu-landing .md-content__inner > h1:first-child {
+  display: none;
+}
+
+.cu-landing .md-content {
+  max-width: 100%;
+}
+
+.cu-landing .md-main__inner {
+  max-width: 100%;
+}
+
+.cu-landing .md-sidebar {
+  display: none;
+}
+
+.cu-landing .md-content {
+  max-width: none;
+  margin: 0;
+}
+
+.cu-landing hr {
+  display: none;
+}
+
+/* ---------- Section base ---------- */
+.cu-section {
+  padding: 5rem 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.cu-section-title {
+  font-size: 1.75rem !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em;
+  color: var(--cu-text);
+  text-align: center;
+  margin-bottom: 0.5rem !important;
+}
+
+.cu-section-subtitle {
+  font-size: 1.05rem !important;
+  color: var(--cu-text-muted) !important;
+  text-align: center;
+  max-width: 600px;
+  margin: 0 auto 3rem !important;
+  line-height: 1.6;
+}
+
+/* ---------- Hero ---------- */
+.cu-hero {
+  text-align: center;
+  padding: 6rem 1.5rem 4rem;
+  max-width: 900px;
+  margin: 0 auto;
+  position: relative;
+}
+
+/* Hero badge (rendered as <p><a>) */
+.cu-hero__badge {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 1rem;
+  border-radius: 100px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: linear-gradient(135deg, var(--cu-gradient-start), var(--cu-gradient-end));
+  color: #fff !important;
+  text-decoration: none !important;
+}
+
+.cu-hero__badge:hover {
+  opacity: 0.9;
+  color: #fff !important;
+}
+
+/* Hero heading */
+.cu-hero h1,
+.cu-hero .cu-hero__heading {
+  font-size: clamp(2.2rem, 5vw, 3.5rem) !important;
+  font-weight: 800 !important;
+  letter-spacing: -0.035em;
+  line-height: 1.1 !important;
+  color: var(--cu-text);
+  margin: 0 0 1.25rem !important;
+  display: block !important;
+}
+
+.cu-gradient-text {
+  background: linear-gradient(135deg, var(--cu-gradient-start), var(--cu-gradient-end));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.cu-hero__desc {
+  font-size: 1.15rem;
+  color: var(--cu-text-muted);
+  line-height: 1.7;
+  max-width: 640px;
+  margin: 0 auto 2rem;
+}
+
+/* Hero actions (contains <p> with links) */
+.cu-hero__actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 2rem;
+}
+
+.cu-hero__actions p {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+/* ---------- Buttons (via attr_list on links) ---------- */
+.cu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.75rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none !important;
+  transition: all 0.15s ease;
+  cursor: pointer;
+  border: none;
+  white-space: nowrap;
+}
+
+.cu-btn--primary {
+  background: linear-gradient(135deg, var(--cu-gradient-start), var(--cu-gradient-end));
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.35);
+}
+
+.cu-btn--primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.45);
+  color: #fff !important;
+}
+
+.cu-btn--secondary {
+  background: var(--cu-surface-card);
+  color: var(--cu-text) !important;
+  border: 1px solid var(--cu-border);
+  box-shadow: var(--cu-shadow);
+}
+
+.cu-btn--secondary:hover {
+  border-color: var(--cu-accent);
+  color: var(--cu-accent) !important;
+  transform: translateY(-1px);
+}
+
+/* ---------- Install bar ---------- */
+.cu-install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: var(--cu-code-bg);
+  color: #e2e8f0;
+  padding: 0.7rem 1.25rem;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.9rem;
+  margin-bottom: 2.5rem;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.cu-install__prompt {
+  color: #a855f7;
+  user-select: none;
+}
+
+.cu-install__cmd {
+  color: #e2e8f0;
+}
+
+/* ---------- Hero code showcase ---------- */
+.cu-hero-code {
+  max-width: 620px;
+  margin: 0 auto;
+  text-align: left;
+  border-radius: var(--cu-radius);
+  overflow: hidden;
+  box-shadow: var(--cu-shadow-lg);
+  border: 1px solid var(--cu-border);
+}
+
+.cu-hero-code pre {
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.cu-hero-code .highlight {
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+/* ---------- Feature grid cards (mkdocs-material native) ---------- */
+.cu-section .grid.cards {
+  margin-top: 0;
+}
+
+/* Style card icons larger */
+.cu-card-icon {
+  font-size: 1.5rem;
+  color: var(--cu-accent);
+}
+
+/* Enhance the native grid cards on the landing page */
+.cu-section .md-typeset .grid.cards > ul > li {
+  border: 1px solid var(--cu-border);
+  border-radius: var(--cu-radius);
+  transition: all 0.2s ease;
+  box-shadow: var(--cu-shadow);
+}
+
+.cu-section .md-typeset .grid.cards > ul > li:hover {
+  border-color: var(--cu-accent-light);
+  box-shadow: var(--cu-shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ---------- Interface tabs section ---------- */
+.cu-interfaces {
+  background: var(--cu-surface-alt);
+  border-radius: var(--cu-radius);
+  padding: 2.5rem;
+  border: 1px solid var(--cu-border);
+}
+
+.cu-interfaces .tabbed-set {
+  margin: 0;
+}
+
+.cu-interfaces .tabbed-labels {
+  border-bottom: 2px solid var(--cu-border);
+}
+
+.cu-interfaces .tabbed-labels > label {
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.75rem 1.25rem;
+}
+
+/* ---------- Comparison table ---------- */
+.cu-comparison {
+  overflow-x: auto;
+}
+
+.cu-comparison table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  border-radius: var(--cu-radius);
+  overflow: hidden;
+  border: 1px solid var(--cu-border);
+  font-size: 0.92rem;
+}
+
+.cu-comparison th {
+  background: var(--cu-surface-alt);
+  font-weight: 700;
+  padding: 1rem 1.25rem;
+  text-align: center;
+  border-bottom: 2px solid var(--cu-border);
+  color: var(--cu-text);
+}
+
+.cu-comparison th:first-child {
+  text-align: left;
+}
+
+.cu-comparison td {
+  padding: 0.85rem 1.25rem;
+  text-align: center;
+  border-bottom: 1px solid var(--cu-border);
+  color: var(--cu-text-muted);
+}
+
+.cu-comparison td:first-child {
+  text-align: left;
+  font-weight: 600;
+  color: var(--cu-text);
+}
+
+.cu-comparison tr:last-child td {
+  border-bottom: none;
+}
+
+/* Highlight the call-use column */
+.cu-comparison th:nth-child(2),
+.cu-comparison td:nth-child(2) {
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--cu-accent);
+  font-weight: 600;
+}
+
+[data-md-color-scheme="slate"] .cu-comparison th:nth-child(2),
+[data-md-color-scheme="slate"] .cu-comparison td:nth-child(2) {
+  background: rgba(99, 102, 241, 0.12);
+}
+
+/* ---------- Works-with items (rendered as <p> with attr_list class) ---------- */
+.cu-works-with__item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  padding: 1rem 1.25rem;
+  background: var(--cu-surface-card);
+  border: 1px solid var(--cu-border);
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--cu-text);
+  transition: all 0.15s ease;
+  margin: 0.25rem;
+}
+
+.cu-works-with__item:hover {
+  border-color: var(--cu-accent-light);
+  transform: translateY(-1px);
+  box-shadow: var(--cu-shadow);
+}
+
+/* Works-with icon styling */
+.cu-fw-icon {
+  font-size: 1.25rem;
+  vertical-align: middle;
+}
+
+/* Center the works-with grid */
+.cu-section .grid {
+  text-align: center;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* ---------- Architecture section ---------- */
+.cu-architecture {
+  background: var(--cu-surface-alt);
+  border-radius: var(--cu-radius);
+  padding: 2.5rem;
+  border: 1px solid var(--cu-border);
+}
+
+.cu-architecture .mermaid {
+  text-align: center;
+}
+
+/* ---------- CTA section ---------- */
+.cu-cta {
+  text-align: center;
+  padding: 5rem 1.5rem;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+.cu-cta h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--cu-text);
+  margin-bottom: 1rem;
+}
+
+.cu-cta > p {
+  font-size: 1.05rem;
+  color: var(--cu-text-muted);
+  margin-bottom: 2rem;
+  line-height: 1.7;
+}
+
+/* Make code blocks in landing match design */
+.cu-landing .highlight {
+  border-radius: var(--cu-radius);
+  overflow: hidden;
+}
+
+/* ---------- Responsive ---------- */
+@media (max-width: 768px) {
+  .cu-hero {
+    padding: 3rem 1rem 2rem;
+  }
+
+  .cu-section {
+    padding: 3rem 1rem;
+  }
+
+  .cu-hero h1 {
+    font-size: 2rem !important;
+  }
+
+  .cu-hero__desc {
+    font-size: 1rem;
+  }
+
+  .cu-interfaces {
+    padding: 1.25rem;
+  }
+
+  .cu-architecture {
+    padding: 1.25rem;
+  }
+
+  .cu-hero__actions p {
+    flex-direction: column;
+  }
+
+  .cu-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .cu-install {
+    font-size: 0.8rem;
+    padding: 0.5rem 1rem;
+  }
+}

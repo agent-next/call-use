@@ -9,7 +9,7 @@ mocks are in place when test modules do their own top-level imports.
 """
 
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 # ---------------------------------------------------------------------------
 # Common livekit module mocks (shared across all test files)
@@ -64,10 +64,30 @@ class FakeAgent:
         return self._session
 
 
+class FakeAgentServer:
+    """Minimal stand-in for livekit.agents.AgentServer.
+
+    Provides rtc_session as a pass-through decorator so the original
+    function body is preserved and can be tested directly.
+    """
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def rtc_session(self, **kwargs):
+        """Pass-through decorator that preserves the original function."""
+
+        def decorator(fn):
+            return fn
+
+        return decorator
+
+
 def _setup_agent_mocks():
     """Install agent-specific mocks. Called at module level."""
     _livekit_agents_mock = MagicMock()
     _livekit_agents_mock.Agent = FakeAgent
+    _livekit_agents_mock.AgentServer = FakeAgentServer
     # function_tool must be callable -- return identity for non-decorator usage,
     # and also work as @function_tool decorator.
     _livekit_agents_mock.function_tool = lambda fn=None, **kw: fn if fn else (lambda f: f)
@@ -80,3 +100,34 @@ def _setup_agent_mocks():
 
 
 _setup_agent_mocks()
+
+
+# ---------------------------------------------------------------------------
+# Server-specific mocks (needed by test_server.py)
+# ---------------------------------------------------------------------------
+
+
+def _setup_server_mocks():
+    """Install server-specific mocks on top of the base livekit mocks."""
+    mock_livekit_api = MagicMock()
+    mock_lkapi_instance = MagicMock()
+    mock_lkapi_instance.__aenter__ = AsyncMock(return_value=mock_lkapi_instance)
+    mock_lkapi_instance.__aexit__ = AsyncMock(return_value=None)
+    mock_livekit_api.return_value = mock_lkapi_instance
+
+    mock_lkapi_instance.agent_dispatch = MagicMock()
+    mock_lkapi_instance.agent_dispatch.create_dispatch = AsyncMock()
+
+    sys.modules["livekit.api"].LiveKitAPI = mock_livekit_api
+
+    lk_api_mod = sys.modules["livekit"].api
+    lk_api_mod.AccessToken = MagicMock
+    lk_api_mod.VideoGrants = MagicMock
+    lk_api_mod.CreateAgentDispatchRequest = MagicMock
+    lk_api_mod.ListRoomsRequest = MagicMock
+    lk_api_mod.ListParticipantsRequest = MagicMock
+    lk_api_mod.SendDataRequest = MagicMock
+    lk_api_mod.UpdateRoomMetadataRequest = MagicMock
+
+
+_setup_server_mocks()

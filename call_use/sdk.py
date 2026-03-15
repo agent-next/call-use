@@ -32,7 +32,7 @@ async def _get_agent_identity(lkapi: LiveKitAPI, room_name: str) -> str:
     agent_id = metadata.get("agent_identity")
     if not agent_id:
         raise RuntimeError("Agent not yet initialized")
-    return agent_id
+    return str(agent_id)
 
 
 class CallAgent:
@@ -194,6 +194,8 @@ class CallAgent:
     async def takeover(self) -> str:
         """Request human takeover. Returns JWT token for human to join the room."""
         await self._send_command("takeover")
+        if self._room_name is None:
+            raise RuntimeError("Call not started; room name unavailable")
         token = api.AccessToken(os.environ["LIVEKIT_API_KEY"], os.environ["LIVEKIT_API_SECRET"])
         token.with_identity(f"human-{self._room_name[:8]}")
         token.with_grants(
@@ -205,7 +207,7 @@ class CallAgent:
                 can_publish_data=False,
             )
         )
-        return token.to_jwt()
+        return token.to_jwt()  # type: ignore[no-any-return]
 
     async def resume(self):
         """Resume agent control after human takeover."""

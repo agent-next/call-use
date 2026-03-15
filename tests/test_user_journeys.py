@@ -9,6 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+pytestmark = pytest.mark.bdd
+
+
 # Mock livekit before any call_use imports that trigger SDK/server loading
 for _mod in [
     "livekit",
@@ -93,16 +96,14 @@ class TestFirstTimeUser:
         ]:
             assert opt in result.output
 
-    def test_auth_help_shows_tiers(self):
-        """User runs 'call-use auth --help' — should see tier info."""
+    def test_auth_command_removed_for_v01(self):
+        """auth command removed for v0.1 — should not be registered."""
         from click.testing import CliRunner
 
         from call_use.cli import main
 
         result = CliRunner().invoke(main, ["auth", "--help"])
-        assert result.exit_code == 0
-        assert "--github" in result.output
-        assert "--phone" in result.output
+        assert result.exit_code != 0
 
 
 class TestUserErrors:
@@ -416,7 +417,7 @@ class TestMCPUserExperience:
                     "OPENAI_API_KEY": "sk-test",
                 },
             ):
-                result = await _do_dial(phone="+18001234567", instructions="test")
+                result = await _do_dial(phone="+12025551234", instructions="test")
                 assert "task_id" in result
                 assert result["status"] == "dispatched"
                 assert "disposition" not in result  # NOT blocking
