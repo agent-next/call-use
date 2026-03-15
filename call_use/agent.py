@@ -40,8 +40,8 @@ SIP_TRUNK_ID = os.environ.get("SIP_TRUNK_ID", "")
 
 # SIP status code -> disposition mapping (RFC 3261)
 SIP_DISPOSITION_MAP: dict[str, "DispositionEnum"] = {
-    "486": DispositionEnum.busy,       # Busy Here
-    "600": DispositionEnum.busy,       # Busy Everywhere
+    "486": DispositionEnum.busy,  # Busy Here
+    "600": DispositionEnum.busy,  # Busy Everywhere
     "480": DispositionEnum.no_answer,  # Temporarily Unavailable
     "408": DispositionEnum.no_answer,  # Request Timeout
     "487": DispositionEnum.cancelled,  # Request Terminated
