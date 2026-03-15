@@ -936,7 +936,10 @@ class TestMCPBehavior:
 
         result = await _do_dial(phone="+18005551234", instructions="test")
         assert "error" in result
-        assert "Missing required environment variables" in result["error"]
+        assert "Server configuration incomplete" in result["error"]
+        assert "missing" in result
+        assert isinstance(result["missing"], list)
+        assert "LIVEKIT_URL" in result["missing"]
         assert "help" in result
 
     @patch("call_use.mcp_server.LiveKitAPI")

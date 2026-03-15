@@ -185,7 +185,10 @@ async def test_do_dial_missing_env_returns_error():
     result = await _do_dial(phone="+18005551234", instructions="test")
     assert "error" in result
     assert "Server configuration incomplete" in result["error"]
-    assert "missing" not in result
+    assert "missing" in result
+    assert isinstance(result["missing"], list)
+    assert "LIVEKIT_URL" in result["missing"]
+    assert "OPENAI_API_KEY" in result["missing"]
     assert result["help"] == "https://github.com/agent-next/call-use#configure"
 
 

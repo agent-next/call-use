@@ -43,18 +43,19 @@ async def _do_dial(
     timeout: int = 600,
 ) -> dict:
     """Dispatch a call via LiveKit and return immediately with task_id."""
-    required = {
-        "LIVEKIT_URL": "LiveKit server URL (wss://...)",
-        "LIVEKIT_API_KEY": "LiveKit API key",
-        "LIVEKIT_API_SECRET": "LiveKit API secret",
-        "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
-        "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
-    }
+    required = [
+        "LIVEKIT_URL",
+        "LIVEKIT_API_KEY",
+        "LIVEKIT_API_SECRET",
+        "SIP_TRUNK_ID",
+        "OPENAI_API_KEY",
+    ]
     missing = [k for k in required if not os.environ.get(k)]
     if missing:
         logger.error("Missing required env vars: %s", missing)
         return {
             "error": "Server configuration incomplete. Required environment variables are not set.",
+            "missing": missing,
             "help": "https://github.com/agent-next/call-use#configure",
         }
 
