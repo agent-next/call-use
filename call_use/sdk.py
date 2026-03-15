@@ -85,6 +85,15 @@ class CallAgent:
 
     async def call(self) -> CallOutcome:
         """Execute the call and return the outcome."""
+        required_vars = ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")
+        missing = [v for v in required_vars if not os.environ.get(v)]
+        if missing:
+            raise RuntimeError(
+                f"Missing required environment variables: {', '.join(missing)}. "
+                "Set these before calling CallAgent.call(). "
+                "See https://docs.call-use.com/getting-started/configuration"
+            )
+
         self._room_name = None
 
         task = CallTask(
