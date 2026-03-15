@@ -59,6 +59,30 @@ class TestCallTask:
         assert task.timeout_seconds == 600
         assert task.recording_disclaimer is None
 
+    def test_timeout_too_low_raises(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="timeout_seconds"):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=0)
+
+    def test_timeout_too_high_raises(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="timeout_seconds"):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=7200)
+
+    def test_timeout_negative_raises(self):
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError, match="timeout_seconds"):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=-1)
+
+    def test_timeout_at_bounds_accepted(self):
+        task_low = CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=30)
+        assert task_low.timeout_seconds == 30
+        task_high = CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=3600)
+        assert task_high.timeout_seconds == 3600
+
 
 # ---------------------------------------------------------------------------
 # Enums

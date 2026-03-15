@@ -362,6 +362,34 @@ def test_dial_with_approval_required(mock_run):
     assert call_kwargs[1]["approval_required"] is True
 
 
+def test_dial_timeout_too_low_rejected():
+    """--timeout below 30 is rejected by Click IntRange."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "5"])
+    assert result.exit_code != 0
+
+
+def test_dial_timeout_too_high_rejected():
+    """--timeout above 3600 is rejected by Click IntRange."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "7200"])
+    assert result.exit_code != 0
+
+
+def test_dial_timeout_zero_rejected():
+    """--timeout=0 is rejected by Click IntRange."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "0"])
+    assert result.exit_code != 0
+
+
+def test_dial_timeout_negative_rejected():
+    """--timeout=-1 is rejected by Click IntRange."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "-1"])
+    assert result.exit_code != 0
+
+
 @patch("call_use.cli._run_call")
 def test_dial_generic_exception_exits_1(mock_run):
     """Unexpected exceptions exit 1 with error message."""

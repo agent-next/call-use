@@ -100,7 +100,7 @@ def main():
 @click.option(
     "--voice-id", default=None, help="TTS voice (alloy, echo, fable, onyx, nova, shimmer)."
 )
-@click.option("--timeout", default=600, type=int, help="Max call duration in seconds.")
+@click.option("--timeout", default=600, type=click.IntRange(30, 3600), help="Max call duration in seconds (30-3600).")
 @click.option(
     "--approval-required",
     is_flag=True,

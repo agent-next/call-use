@@ -67,6 +67,10 @@ class CallAgent:
                 "on_approval callback is required when approval_required=True. "
                 "Either provide on_approval or set approval_required=False."
             )
+        if not (30 <= timeout_seconds <= 3600):
+            raise ValueError(
+                f"timeout_seconds must be between 30 and 3600, got {timeout_seconds}"
+            )
         self._phone = validate_phone_number(phone)
         self._caller_id = validate_caller_id(caller_id)
         self._instructions = instructions

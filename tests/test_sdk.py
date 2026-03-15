@@ -72,6 +72,49 @@ class TestCallAgentConstructor:
         agent = CallAgent(phone="+18002234567", instructions="", approval_required=False)
         assert agent._instructions == ""
 
+    def test_timeout_too_low_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be between 30 and 3600"):
+            CallAgent(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=False,
+                timeout_seconds=0,
+            )
+
+    def test_timeout_too_high_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be between 30 and 3600"):
+            CallAgent(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=False,
+                timeout_seconds=7200,
+            )
+
+    def test_timeout_negative_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be between 30 and 3600"):
+            CallAgent(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=False,
+                timeout_seconds=-1,
+            )
+
+    def test_timeout_at_bounds_accepted(self):
+        agent_low = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+            timeout_seconds=30,
+        )
+        assert agent_low._timeout_seconds == 30
+        agent_high = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+            timeout_seconds=3600,
+        )
+        assert agent_high._timeout_seconds == 3600
+
     def test_very_long_instructions_accepted(self):
         """Long instructions should not crash."""
         long_text = "Do this. " * 1000
@@ -305,7 +348,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,  # Immediate timeout
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -318,10 +361,14 @@ class TestCallAgentCallMethod:
         # Fallback room listing returns no rooms
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
 
+        async def _immediate_timeout(coro, timeout):
+            raise asyncio.TimeoutError()
+
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -344,7 +391,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -366,10 +413,14 @@ class TestCallAgentCallMethod:
         mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
 
+        async def _immediate_timeout(coro, timeout):
+            raise asyncio.TimeoutError()
+
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -383,14 +434,6 @@ class TestCallAgentCallMethod:
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            async def _send_non_call_event():
-                await asyncio.sleep(0.01)
-                if data_handler:
-                    dp = MagicMock()
-                    dp.topic = "other-topic"  # Not "call-events"
-                    data_handler(dp)
-
-            asyncio.create_task(_send_non_call_event())
             outcome = await agent.call()
             assert outcome.disposition == "timeout"
 
@@ -574,7 +617,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -600,10 +643,14 @@ class TestCallAgentCallMethod:
         )
         mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_fallback_room]))
 
+        async def _immediate_timeout(coro, timeout):
+            raise asyncio.TimeoutError()
+
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
             patch.dict(
                 os.environ,
                 {
@@ -627,7 +674,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -651,10 +698,14 @@ class TestCallAgentCallMethod:
                 return dispatch_api
             return fallback_api
 
+        async def _immediate_timeout(coro, timeout):
+            raise asyncio.TimeoutError()
+
         with (
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.asyncio.wait_for", side_effect=_immediate_timeout),
             patch.dict(
                 os.environ,
                 {
