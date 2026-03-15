@@ -239,6 +239,52 @@ class TestGetCallKnown:
 
 
 # ===========================================================================
+# 6b: GET /calls/{id} ended → cleanup internal state
+# ===========================================================================
+
+
+class TestGetCallEndedCleanup:
+    def test_ended_call_cleans_up_internal_state(self, client, headers):
+        """GET /calls/{id} when state is 'ended' removes task from call_rooms and _call_locks."""
+        # Create a call to populate internal dicts
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            create_resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Test call",
+                },
+                headers=headers,
+            )
+
+        assert create_resp.status_code == 200
+        task_id = create_resp.json()["task_id"]
+
+        # Mock LiveKitAPI to return state "ended"
+        mock_room = MagicMock()
+        mock_room.metadata = '{"state": "ended"}'
+        lkapi_instance = sys.modules["livekit.api"].LiveKitAPI.return_value
+        lkapi_instance.room = MagicMock()
+        lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+        lkapi_instance.room.list_participants = AsyncMock(
+            return_value=MagicMock(participants=[])
+        )
+
+        resp = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["state"] == "ended"
+
+        # After cleanup, the task_id should no longer be in call_rooms → 404
+        resp2 = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp2.status_code == 404
+
+
+# ===========================================================================
 # 7: GET /calls/{unknown} → 404
 # ===========================================================================
 

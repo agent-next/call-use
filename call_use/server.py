@@ -70,6 +70,11 @@ def create_app(api_key: str | None = None) -> FastAPI:
             _call_locks[call_id] = asyncio.Lock()
         return _call_locks[call_id]
 
+    def _cleanup_call(call_id: str) -> None:
+        """Remove a call from in-memory registries to prevent memory leaks."""
+        call_rooms.pop(call_id, None)
+        _call_locks.pop(call_id, None)
+
     async def verify_api_key_dep(x_api_key: str = Header()):
         if not hmac.compare_digest(x_api_key, api_key):
             raise HTTPException(401, "Invalid API key")
@@ -185,6 +190,9 @@ def create_app(api_key: str | None = None) -> FastAPI:
                     api.ListParticipantsRequest(room=room_name)
                 )
                 participants = [p.identity for p in parts.participants]
+        if state == "ended":
+            _cleanup_call(call_id)
+
         return CallStatusResponse(
             task_id=call_id,
             state=state,
