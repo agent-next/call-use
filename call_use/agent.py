@@ -290,7 +290,7 @@ class _LiveKitCallAgent(Agent):
             return
         try:
             payload = json.loads(data_packet.data.decode("utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError, Exception) as exc:
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
             logger.warning("Malformed data packet, ignoring: %s", exc)
             return
         cmd_type = payload.get("type")

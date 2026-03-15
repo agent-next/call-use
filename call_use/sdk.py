@@ -108,26 +108,24 @@ class CallAgent:
             event_data = json.loads(dp.data.decode("utf-8"))
             try:
                 event = CallEvent(**event_data)
-            except Exception as exc:
-                logger.warning("Failed to parse CallEvent: %s", exc)
+            except (TypeError, ValueError) as exc:
+                logger.warning("Failed to parse CallEvent (%s): %s", type(exc).__name__, exc)
                 return
 
             if self._on_event:
                 loop = asyncio.get_running_loop()
                 fut = loop.run_in_executor(None, self._on_event, event)
-                fut.add_done_callback(
-                    lambda f: (
-                        not f.cancelled()
-                        and f.exception()
-                        and logger.warning("on_event callback error: %s", f.exception())
-                    )
-                )
+                def _log_callback_error(f: asyncio.Future) -> None:
+                    if not f.cancelled() and f.exception():
+                        logger.warning("on_event callback error: %s", f.exception())
+
+                fut.add_done_callback(_log_callback_error)
 
             if event.type == CallEventType.call_complete:
                 try:
                     outcome_holder[0] = CallOutcome(**event.data)
-                except Exception as exc:
-                    logger.warning("Failed to parse CallOutcome: %s", exc)
+                except (TypeError, ValueError) as exc:
+                    logger.warning("Failed to parse CallOutcome (%s): %s", type(exc).__name__, exc)
                 call_complete.set()
                 return
 
