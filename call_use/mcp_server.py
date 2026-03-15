@@ -215,7 +215,13 @@ async def dial(
             timeout=timeout,
         )
         return json.dumps(result, indent=2)
-    except Exception:
+    except Exception as e:
+        error_msg = str(e)
+        if "worker" in error_msg.lower() and "not running" in error_msg.lower():
+            return json.dumps({
+                "error": "No worker available. Start the worker: call-use-worker start",
+                "help": "Run 'call-use-worker start' in another terminal before dialing.",
+            })
         logger.error("dial tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details."})
 

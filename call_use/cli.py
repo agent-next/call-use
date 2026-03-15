@@ -8,7 +8,7 @@ from typing import Any
 
 import click
 
-from call_use.models import CallEvent
+from call_use.models import CallError, CallErrorCode, CallEvent
 
 
 def _check_env():
@@ -138,6 +138,17 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
             timeout=timeout,
             approval_required=approval_required,
         )
+    except CallError as e:
+        if e.code == CallErrorCode.worker_not_running:
+            click.echo(
+                "Error: No worker available. "
+                "Start the worker in another terminal:\n"
+                "  call-use-worker start",
+                err=True,
+            )
+        else:
+            click.echo(f"Error: {e}", err=True)
+        sys.exit(1)
     except ValueError as e:
         click.echo(f"Invalid phone number: {e}", err=True)
         sys.exit(2)
