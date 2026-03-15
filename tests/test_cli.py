@@ -199,3 +199,14 @@ def test_check_env_passes_when_all_set():
     from call_use.cli import _check_env
 
     _check_env()  # Should not raise
+
+
+def test_auth_command_not_registered():
+    """auth command removed for v0.1 -- only dial should be registered."""
+    from click.testing import CliRunner
+
+    from call_use.cli import main
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["auth"])
+    assert result.exit_code != 0
