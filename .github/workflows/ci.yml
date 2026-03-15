@@ -18,8 +18,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install ruff
-      - run: ruff check call_use/
-      - run: ruff format --check call_use/
+      - run: ruff check call_use/ tests/
+      - run: ruff format --check call_use/ tests/
 
   typecheck:
     runs-on: ubuntu-latest
@@ -67,7 +67,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install bandit safety
-      - run: bandit -r call_use/ -c pyproject.toml || true
+      - run: bandit -r call_use/ -c pyproject.toml -ll
       - run: safety check --short-report || true
 
   build:

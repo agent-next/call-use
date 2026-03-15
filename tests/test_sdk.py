@@ -308,7 +308,7 @@ class TestCallAgentCallMethod:
         )
 
         mock_room = MagicMock()
-        mock_room.on = lambda event_name: (lambda fn: fn)
+        mock_room.on = lambda event_name: lambda fn: fn
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -577,7 +577,7 @@ class TestCallAgentCallMethod:
         )
 
         mock_room = MagicMock()
-        mock_room.on = lambda event_name: (lambda fn: fn)
+        mock_room.on = lambda event_name: lambda fn: fn
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -630,7 +630,7 @@ class TestCallAgentCallMethod:
         )
 
         mock_room = MagicMock()
-        mock_room.on = lambda event_name: (lambda fn: fn)
+        mock_room.on = lambda event_name: lambda fn: fn
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
