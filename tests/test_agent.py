@@ -1452,6 +1452,113 @@ class TestEntrypoint:
 # ===========================================================================
 
 
+class TestVoiceIdAllowlist:
+    """voice_id allowlist validation in agent.run()."""
+
+    async def test_invalid_voice_id_falls_back_to_alloy(self):
+        """Invalid voice_id in task defaults to 'alloy'."""
+        task = _make_task(voice_id="hacker_voice")
+        agent = _make_agent(task=task)
+
+        ctx = MagicMock()
+        ctx.room = MagicMock()
+        ctx.room.name = "call-test"
+        ctx.room.local_participant = MagicMock()
+        ctx.room.local_participant.identity = "agent-test"
+        ctx.room.on = MagicMock()
+        ctx.api = MagicMock()
+        ctx.api.sip.create_sip_participant = AsyncMock(side_effect=Exception("stop"))
+
+        # agent.run() will fail at SIP dial, but we can check what TTS voice was used
+        from unittest.mock import patch
+
+        captured_voice = {}
+
+        original_tts = MagicMock()
+
+        def capture_tts(*args, **kwargs):
+            captured_voice["voice"] = kwargs.get("voice", args[2] if len(args) > 2 else None)
+            return original_tts
+
+        with patch("call_use.agent.openai.TTS", side_effect=capture_tts):
+            with patch("call_use.agent.deepgram.STT", return_value=MagicMock()):
+                with patch("call_use.agent.openai.LLM", return_value=MagicMock()):
+                    with patch("call_use.agent.silero.VAD") as mock_vad:
+                        mock_vad.load.return_value = MagicMock()
+                        with patch("call_use.agent.AgentSession"):
+                            await agent.run(ctx)
+
+        assert captured_voice["voice"] == "alloy"
+
+    async def test_valid_voice_id_used(self):
+        """Valid voice_id in task is used as-is."""
+        task = _make_task(voice_id="nova")
+        agent = _make_agent(task=task)
+
+        ctx = MagicMock()
+        ctx.room = MagicMock()
+        ctx.room.name = "call-test"
+        ctx.room.local_participant = MagicMock()
+        ctx.room.local_participant.identity = "agent-test"
+        ctx.room.on = MagicMock()
+        ctx.api = MagicMock()
+        ctx.api.sip.create_sip_participant = AsyncMock(side_effect=Exception("stop"))
+
+        from unittest.mock import patch
+
+        captured_voice = {}
+
+        original_tts = MagicMock()
+
+        def capture_tts(*args, **kwargs):
+            captured_voice["voice"] = kwargs.get("voice", args[2] if len(args) > 2 else None)
+            return original_tts
+
+        with patch("call_use.agent.openai.TTS", side_effect=capture_tts):
+            with patch("call_use.agent.deepgram.STT", return_value=MagicMock()):
+                with patch("call_use.agent.openai.LLM", return_value=MagicMock()):
+                    with patch("call_use.agent.silero.VAD") as mock_vad:
+                        mock_vad.load.return_value = MagicMock()
+                        with patch("call_use.agent.AgentSession"):
+                            await agent.run(ctx)
+
+        assert captured_voice["voice"] == "nova"
+
+    async def test_none_voice_id_defaults_to_alloy(self):
+        """None voice_id defaults to 'alloy'."""
+        task = _make_task(voice_id=None)
+        agent = _make_agent(task=task)
+
+        ctx = MagicMock()
+        ctx.room = MagicMock()
+        ctx.room.name = "call-test"
+        ctx.room.local_participant = MagicMock()
+        ctx.room.local_participant.identity = "agent-test"
+        ctx.room.on = MagicMock()
+        ctx.api = MagicMock()
+        ctx.api.sip.create_sip_participant = AsyncMock(side_effect=Exception("stop"))
+
+        from unittest.mock import patch
+
+        captured_voice = {}
+
+        original_tts = MagicMock()
+
+        def capture_tts(*args, **kwargs):
+            captured_voice["voice"] = kwargs.get("voice", args[2] if len(args) > 2 else None)
+            return original_tts
+
+        with patch("call_use.agent.openai.TTS", side_effect=capture_tts):
+            with patch("call_use.agent.deepgram.STT", return_value=MagicMock()):
+                with patch("call_use.agent.openai.LLM", return_value=MagicMock()):
+                    with patch("call_use.agent.silero.VAD") as mock_vad:
+                        mock_vad.load.return_value = MagicMock()
+                        with patch("call_use.agent.AgentSession"):
+                            await agent.run(ctx)
+
+        assert captured_voice["voice"] == "alloy"
+
+
 class TestAgentMain:
     def test_main_calls_cli_run_app(self):
         """main() calls cli.run_app(server)."""

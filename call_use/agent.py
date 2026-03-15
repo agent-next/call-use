@@ -540,7 +540,8 @@ class _LiveKitCallAgent(Agent):
         self._lk_api = ctx.api
         task = self._task
 
-        tts_voice = task.voice_id or "alloy"
+        VALID_VOICES = {"alloy", "echo", "fable", "onyx", "nova", "shimmer"}
+        tts_voice = task.voice_id if task.voice_id in VALID_VOICES else "alloy"
         session = AgentSession(
             stt=deepgram.STT(model="nova-3", language="en-US"),
             llm=openai.LLM(model="gpt-4o"),
