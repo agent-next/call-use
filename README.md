@@ -250,6 +250,13 @@ pip install -e ".[dev]"
 pytest
 ```
 
+## Known Limitations
+
+- **In-memory state**: The REST API server stores call state in memory. State is lost on restart. For production, consider using LiveKit room metadata for call recovery, or contribute a persistence backend.
+- **Caller ID**: v0.1 validates caller ID format only. Ownership verification (via Twilio Lookup API) is planned for v0.2.
+- **Single worker**: The agent worker is designed for single-instance deployment. Horizontal scaling requires a shared state backend.
+- **PSTN only**: Currently supports outbound PSTN calls via Twilio SIP. WebRTC-to-WebRTC calls are not yet supported.
+
 ## License
 
 MIT
