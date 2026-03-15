@@ -231,6 +231,17 @@
   color: #e2e8f0;
 }
 
+/* ---------- Hero video ---------- */
+.cu-hero-video {
+  max-width: 960px;
+  margin: 2rem auto;
+  text-align: center;
+}
+
+.cu-hero-video video {
+  border: 1px solid var(--cu-border);
+}
+
 /* ---------- Hero code showcase ---------- */
 .cu-hero-code {
   max-width: 620px;

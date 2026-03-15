@@ -10,6 +10,12 @@
 
 **Give your AI agent the ability to make phone calls.**
 
+<div align="center">
+
+https://github.com/agent-next/call-use/raw/main/docs/assets/demo.mp4
+
+</div>
+
 ```python
 from call_use import CallAgent
 
