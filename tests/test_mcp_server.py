@@ -383,8 +383,6 @@ async def test_do_dial_rejects_invalid_phone():
 @patch.dict(os.environ, _FULL_ENV)
 async def test_do_dial_rejects_invalid_caller_id():
     """_do_dial returns error for invalid caller_id."""
-    result = await _do_dial(
-        phone="+12025551234", instructions="test", caller_id="bad-caller"
-    )
+    result = await _do_dial(phone="+12025551234", instructions="test", caller_id="bad-caller")
     assert "error" in result
     assert "Invalid caller ID" in result["error"]

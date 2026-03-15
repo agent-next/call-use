@@ -23,7 +23,7 @@ typecheck:
 	mypy call_use/ --ignore-missing-imports
 
 security:
-	bandit -r call_use/ -c pyproject.toml
+	bandit -r call_use/ -c pyproject.toml -ll
 	safety check --short-report || true
 
 build: clean
