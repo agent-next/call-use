@@ -110,8 +110,9 @@ class TestCallAgentEnvValidation:
             os.environ.pop("LIVEKIT_API_KEY", None)
             os.environ.pop("LIVEKIT_API_SECRET", None)
 
-            with pytest.raises(CallError, match="Missing required environment variables"):
+            with pytest.raises(CallError, match="Missing required environment variables") as exc_info:
                 await agent.call()
+            assert exc_info.value.code == CallErrorCode.configuration_error
 
     async def test_call_missing_env_lists_all_missing_vars(self):
         """Error message lists all missing variable names."""
@@ -127,6 +128,7 @@ class TestCallAgentEnvValidation:
 
             with pytest.raises(CallError, match="LIVEKIT_API_KEY") as exc_info:
                 await agent.call()
+            assert exc_info.value.code == CallErrorCode.configuration_error
             msg = str(exc_info.value)
             assert "LIVEKIT_URL" in msg
             assert "LIVEKIT_API_SECRET" in msg
@@ -149,6 +151,7 @@ class TestCallAgentEnvValidation:
 
             with pytest.raises(CallError, match="LIVEKIT_API_KEY") as exc_info:
                 await agent.call()
+            assert exc_info.value.code == CallErrorCode.configuration_error
             msg = str(exc_info.value)
             assert "LIVEKIT_URL" not in msg
 
