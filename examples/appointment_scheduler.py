@@ -63,8 +63,6 @@ async def main():
     print("\n--- Call Complete ---")
     print(f"Duration:    {outcome.duration_seconds:.1f}s")
     print(f"Disposition: {outcome.disposition.value}")
-    if outcome.summary:
-        print(f"Summary:     {outcome.summary}")
     print(f"Transcript:  {len(outcome.transcript)} turns")
 
 
