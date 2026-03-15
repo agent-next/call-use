@@ -491,7 +491,6 @@ class TestCheckLivekitConnectivity:
         assert "LiveKit connection failed" in msg
         assert "Connection refused" in msg
 
-
 # ===========================================================================
 # _run_call (lines 62-84)
 # ===========================================================================
