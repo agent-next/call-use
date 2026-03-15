@@ -39,6 +39,12 @@ Three lines of Python. That's it.
 <span class="cu-install__cmd">pip install call-use</span>
 </div>
 
+<div class="cu-hero-video">
+<video autoplay loop muted playsinline style="width: 100%; max-width: 960px; border-radius: 16px; box-shadow: 0 25px 60px rgba(0,0,0,0.3);">
+<source src="assets/demo.mp4" type="video/mp4">
+</video>
+</div>
+
 <div class="cu-hero-code" markdown>
 
 ```python
