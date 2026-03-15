@@ -222,7 +222,7 @@ async def dial(
                 "error": "No worker available. Start the worker: call-use-worker start",
                 "help": "Run 'call-use-worker start' in another terminal before dialing.",
             })
-        return json.dumps({"error": "Call failed", "code": str(e.code)})
+        return json.dumps({"error": "Call failed", "code": str(e.code.value)})
     except Exception:
         logger.error("dial tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details."})

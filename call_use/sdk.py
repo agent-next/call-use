@@ -110,7 +110,7 @@ class CallAgent:
         @room.on("participant_connected")
         def _on_participant(participant):
             identity = getattr(participant, "identity", "") or ""
-            if identity.startswith("agent-"):
+            if identity.startswith("call-use-agent-"):
                 worker_joined.set()
 
         # Register data handler BEFORE connecting

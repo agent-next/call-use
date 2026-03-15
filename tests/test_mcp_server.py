@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from call_use.models import CallError, CallErrorCode
 from call_use.mcp_server import _do_dial, _do_result, _do_status
 
 pytestmark = pytest.mark.unit
@@ -465,3 +466,79 @@ async def test_do_dial_rejects_invalid_caller_id():
     result = await _do_dial(phone="+12025551234", instructions="test", caller_id="bad-caller")
     assert "error" in result
     assert "Invalid caller ID" in result["error"]
+
+
+# ===========================================================================
+# CallError handling in dial tool
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+@patch("call_use.mcp_server._do_dial")
+async def test_dial_worker_not_running_error(mock_do_dial):
+    """dial returns helpful error when worker_not_running CallError is raised."""
+    mock_do_dial.side_effect = CallError(
+        code=CallErrorCode.worker_not_running,
+        message="Worker not running",
+    )
+    from call_use.mcp_server import dial
+
+    result_str = await dial(phone="+18005551234", instructions="Test")
+    result = json.loads(result_str)
+    assert "error" in result
+    assert "No worker available" in result["error"]
+    assert "help" in result
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+@patch("call_use.mcp_server._do_dial")
+async def test_dial_generic_call_error(mock_do_dial):
+    """dial returns error with code for non-worker_not_running CallError."""
+    mock_do_dial.side_effect = CallError(
+        code=CallErrorCode.dial_failed,
+        message="Connection refused",
+    )
+    from call_use.mcp_server import dial
+
+    result_str = await dial(phone="+18005551234", instructions="Test")
+    result = json.loads(result_str)
+    assert result["error"] == "Call failed"
+    assert result["code"] == "dial_failed"
+
+
+# ===========================================================================
+# SDK worker identity prefix check
+# ===========================================================================
+
+
+def test_non_agent_participant_does_not_trigger_worker_joined():
+    """A participant with identity 'sdk-abc123' must NOT satisfy the worker join check."""
+    import asyncio
+
+    worker_joined = asyncio.Event()
+
+    # Simulate the participant handler logic from CallAgent.call()
+    def on_participant(participant):
+        identity = getattr(participant, "identity", "") or ""
+        if identity.startswith("call-use-agent-"):
+            worker_joined.set()
+
+    # Non-agent participant
+    sdk_participant = MagicMock()
+    sdk_participant.identity = "sdk-abc123"
+    on_participant(sdk_participant)
+    assert not worker_joined.is_set(), "sdk-abc123 should NOT trigger worker_joined"
+
+    # Also test generic "agent-" prefix does NOT match
+    generic_participant = MagicMock()
+    generic_participant.identity = "agent-generic-xyz"
+    on_participant(generic_participant)
+    assert not worker_joined.is_set(), "agent-generic-xyz should NOT trigger worker_joined"
+
+    # Correct prefix DOES match
+    worker_participant = MagicMock()
+    worker_participant.identity = "call-use-agent-abc123"
+    on_participant(worker_participant)
+    assert worker_joined.is_set(), "call-use-agent-abc123 SHOULD trigger worker_joined"

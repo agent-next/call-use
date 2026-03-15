@@ -280,7 +280,7 @@ class TestCallAgentCallMethod:
                 # Worker joins first
                 if "participant_connected" in handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     handlers["participant_connected"](p)
                 await asyncio.sleep(0.02)
                 if handlers.get("data_received"):
@@ -399,7 +399,7 @@ class TestCallAgentCallMethod:
                 # Worker joins
                 if "participant_connected" in handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     handlers["participant_connected"](p)
                 await asyncio.sleep(0.01)
                 if handlers.get("data_received"):
@@ -464,7 +464,7 @@ class TestCallAgentCallMethod:
                 # Worker joins first
                 if "participant_connected" in handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     handlers["participant_connected"](p)
                 await asyncio.sleep(0.02)
                 data_handler = handlers.get("data_received")
@@ -557,7 +557,7 @@ class TestCallAgentCallMethod:
                 # Worker joins first
                 if "participant_connected" in handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     handlers["participant_connected"](p)
                 await asyncio.sleep(0.02)
                 data_handler = handlers.get("data_received")
@@ -652,7 +652,7 @@ class TestCallAgentCallMethod:
                 await asyncio.sleep(0.02)
                 if "participant_connected" in _handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     _handlers["participant_connected"](p)
 
             asyncio.create_task(_simulate_worker_join())
@@ -713,7 +713,7 @@ class TestCallAgentCallMethod:
                 await asyncio.sleep(0.02)
                 if "participant_connected" in _handlers:
                     p = MagicMock()
-                    p.identity = "agent-abc123"
+                    p.identity = "call-use-agent-abc123"
                     _handlers["participant_connected"](p)
 
             asyncio.create_task(_simulate_worker_join())
@@ -1106,7 +1106,7 @@ class TestWorkerNotRunningDetection:
                 # Worker joins
                 if "participant_connected" in handlers:
                     participant = MagicMock()
-                    participant.identity = "agent-abc123"
+                    participant.identity = "call-use-agent-abc123"
                     handlers["participant_connected"](participant)
                 await asyncio.sleep(0.02)
                 # Call completes
