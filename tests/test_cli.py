@@ -409,8 +409,7 @@ class TestDoctor:
     )
     @patch.dict(
         os.environ,
-        {k: v for k, v in _ALL_DOCTOR_ENV.items()
-         if k != "DEEPGRAM_API_KEY"},
+        {k: v for k, v in _ALL_DOCTOR_ENV.items() if k != "DEEPGRAM_API_KEY"},
         clear=True,
     )
     def test_doctor_missing_vars_shows_failure(self, mock_lk):
@@ -439,10 +438,16 @@ class TestDoctor:
 
     @patch.dict(
         os.environ,
-        {k: v for k, v in _ALL_DOCTOR_ENV.items()
-         if k not in (
-             "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
-         )},
+        {
+            k: v
+            for k, v in _ALL_DOCTOR_ENV.items()
+            if k
+            not in (
+                "LIVEKIT_URL",
+                "LIVEKIT_API_KEY",
+                "LIVEKIT_API_SECRET",
+            )
+        },
         clear=True,
     )
     def test_doctor_livekit_skipped_when_creds_missing(self):

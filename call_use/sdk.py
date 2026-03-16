@@ -123,7 +123,9 @@ class CallAgent:
                 except (TypeError, ValueError) as exc:
                     logger.error(
                         "Failed to parse CallOutcome (raw data: %s): %s",
-                        event.data, exc, exc_info=True,
+                        event.data,
+                        exc,
+                        exc_info=True,
                     )
                     fallback_id = (
                         event.data.get("task_id", "unknown")
