@@ -43,6 +43,24 @@ async def test_do_dial_returns_task_id(MockLiveKitAPI):
 @patch.dict(os.environ, _FULL_ENV)
 @patch("call_use.mcp_server.CreateAgentDispatchRequest")
 @patch("call_use.mcp_server.LiveKitAPI")
+async def test_do_dial_sets_approval_required_false(MockLiveKitAPI, MockDispatchReq):
+    """MCP mode always sets approval_required=False (non-interactive, no stdin)."""
+    mock_api = AsyncMock()
+    mock_api.room.create_room.return_value = MagicMock()
+    mock_api.agent_dispatch.create_dispatch.return_value = MagicMock()
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    await _do_dial(phone="+18005551234", instructions="Test approval flag")
+    dispatch_kwargs = MockDispatchReq.call_args.kwargs
+    metadata = json.loads(dispatch_kwargs["metadata"])
+    assert metadata["approval_required"] is False
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+@patch("call_use.mcp_server.CreateAgentDispatchRequest")
+@patch("call_use.mcp_server.LiveKitAPI")
 async def test_do_dial_with_user_info(MockLiveKitAPI, MockDispatchReq):
     """dial passes user_info in dispatch metadata."""
     mock_api = AsyncMock()
@@ -333,6 +351,15 @@ async def test_result_tool_returns_json_on_success(MockLiveKitAPI):
     result_str = await result(task_id="call-test-result")
     parsed = json.loads(result_str)
     assert parsed["disposition"] == "completed"
+
+
+def test_dial_docstring_documents_approval_limitation():
+    """dial tool docstring mentions that approval is not available in MCP mode."""
+    from call_use.mcp_server import dial
+
+    docstring = dial.__doc__
+    assert "approval" in docstring.lower()
+    assert "MCP" in docstring or "mcp" in docstring.lower()
 
 
 def test_mcp_server_main_calls_run():

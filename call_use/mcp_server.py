@@ -121,6 +121,9 @@ async def _do_dial(
                 "caller_id": caller_id,
                 "voice_id": voice_id,
                 "timeout_seconds": timeout,
+                # MCP tools are non-interactive (no stdin/stdout for prompts),
+                # so approval flows cannot work. Users who need pre-call
+                # approval should use the SDK or REST API instead.
                 "approval_required": False,
             }
         )
@@ -183,6 +186,10 @@ async def dial(
 
     The call runs asynchronously. Use 'status' to poll progress, 'cancel' to abort,
     and 'result' to retrieve the final outcome once the call completes.
+
+    Note: Pre-call approval is not available in MCP mode because MCP tools are
+    non-interactive (no stdin for approval prompts). If you need approval before
+    dialing, use the call-use SDK or REST API instead.
 
     Args:
         phone: Target phone number in E.164 format (e.g., +18001234567). US/Canada only.
