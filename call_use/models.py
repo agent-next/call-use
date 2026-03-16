@@ -18,6 +18,8 @@ def _generate_task_id() -> str:
 
 
 class CallTask(BaseModel):
+    """Configuration for an outbound phone call task."""
+
     task_id: str = Field(default_factory=_generate_task_id)
     phone_number: str  # E.164
     caller_id: str | None = None
@@ -35,6 +37,8 @@ class CallTask(BaseModel):
 
 
 class CallStateEnum(str, Enum):
+    """Possible states of a call during its lifecycle."""
+
     created = "created"
     dialing = "dialing"
     ringing = "ringing"
@@ -48,6 +52,8 @@ class CallStateEnum(str, Enum):
 
 
 class DispositionEnum(str, Enum):
+    """Final outcome classification of a completed call."""
+
     completed = "completed"
     failed = "failed"
     no_answer = "no_answer"
@@ -59,6 +65,8 @@ class DispositionEnum(str, Enum):
 
 
 class CallEventType(str, Enum):
+    """Types of events emitted during a call lifecycle."""
+
     state_change = "state_change"
     transcript = "transcript"
     dtmf = "dtmf"
@@ -71,6 +79,8 @@ class CallEventType(str, Enum):
 
 
 class CallErrorCode(str, Enum):
+    """Structured error codes for programmatic error handling."""
+
     dial_failed = "dial_failed"
     no_answer = "no_answer"
     busy = "busy"
@@ -89,12 +99,16 @@ class CallErrorCode(str, Enum):
 
 
 class CallEvent(BaseModel):
+    """A single event emitted during a call lifecycle."""
+
     timestamp: float = Field(default_factory=time.time)
     type: CallEventType
     data: dict = Field(default_factory=dict)
 
 
 class CallOutcome(BaseModel):
+    """Result of a completed phone call, including transcript and disposition."""
+
     task_id: str
     transcript: list[dict]  # [{speaker, text, timestamp}]
     events: list[CallEvent]
@@ -110,6 +124,8 @@ class CallOutcome(BaseModel):
 
 
 class CallError(Exception):
+    """Structured error raised by call-use operations."""
+
     def __init__(self, code: CallErrorCode, message: str) -> None:
         self.code = code
         self.message = message
