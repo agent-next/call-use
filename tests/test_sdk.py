@@ -810,12 +810,11 @@ class TestMalformedCallOutcome:
         )
 
         mock_room = MagicMock()
-        data_handler = None
+        handlers = {}
 
         def capture_handler(event_name):
             def decorator(fn):
-                nonlocal data_handler
-                data_handler = fn
+                handlers[event_name] = fn
                 return fn
 
             return decorator
@@ -845,8 +844,14 @@ class TestMalformedCallOutcome:
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
             async def _simulate_malformed_complete():
-                await asyncio.sleep(0.05)
-                if data_handler:
+                await asyncio.sleep(0.02)
+                # Worker joins first
+                if "participant_connected" in handlers:
+                    p = MagicMock()
+                    p.identity = "call-use-agent-abc123"
+                    handlers["participant_connected"](p)
+                await asyncio.sleep(0.02)
+                if handlers.get("data_received"):
                     dp = MagicMock()
                     dp.topic = "call-events"
                     # call_complete event with malformed data (missing required fields)
@@ -859,7 +864,7 @@ class TestMalformedCallOutcome:
                             },
                         }
                     ).encode()
-                    data_handler(dp)
+                    handlers["data_received"](dp)
 
             asyncio.create_task(_simulate_malformed_complete())
             outcome = await agent.call()
@@ -878,12 +883,11 @@ class TestMalformedCallOutcome:
         )
 
         mock_room = MagicMock()
-        data_handler = None
+        handlers = {}
 
         def capture_handler(event_name):
             def decorator(fn):
-                nonlocal data_handler
-                data_handler = fn
+                handlers[event_name] = fn
                 return fn
 
             return decorator
@@ -900,6 +904,7 @@ class TestMalformedCallOutcome:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
             patch.dict(
                 os.environ,
                 {
@@ -915,12 +920,18 @@ class TestMalformedCallOutcome:
 
             async def _simulate_malformed_event():
                 await asyncio.sleep(0.01)
-                if data_handler:
+                # Worker joins first
+                if "participant_connected" in handlers:
+                    p = MagicMock()
+                    p.identity = "call-use-agent-abc123"
+                    handlers["participant_connected"](p)
+                await asyncio.sleep(0.01)
+                if handlers.get("data_received"):
                     dp = MagicMock()
                     dp.topic = "call-events"
                     # Malformed event: missing 'type' field
                     dp.data = json.dumps({"bad_field": "no_type"}).encode()
-                    data_handler(dp)
+                    handlers["data_received"](dp)
 
             asyncio.create_task(_simulate_malformed_event())
             # Should not crash; falls through to timeout
