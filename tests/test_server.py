@@ -239,6 +239,51 @@ class TestGetCallKnown:
 
 
 # ===========================================================================
+# 6b: GET /calls/{id} ended → returns ended idempotently (no cleanup on GET)
+# ===========================================================================
+
+
+class TestGetCallEndedIdempotent:
+    def test_ended_call_returns_ended_on_repeated_get(self, client, headers):
+        """GET /calls/{id} when state is 'ended' returns ended consistently (idempotent)."""
+        # Create a call to populate internal dicts
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            create_resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Test call",
+                },
+                headers=headers,
+            )
+
+        assert create_resp.status_code == 200
+        task_id = create_resp.json()["task_id"]
+
+        # Mock LiveKitAPI to return state "ended"
+        mock_room = MagicMock()
+        mock_room.metadata = '{"state": "ended"}'
+        lkapi_instance = sys.modules["livekit.api"].LiveKitAPI.return_value
+        lkapi_instance.room = MagicMock()
+        lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+        lkapi_instance.room.list_participants = AsyncMock(return_value=MagicMock(participants=[]))
+
+        resp = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp.status_code == 200
+        assert resp.json()["state"] == "ended"
+
+        # GET is idempotent — second call also returns ended, not 404
+        resp2 = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp2.status_code == 200
+        assert resp2.json()["state"] == "ended"
+
+
+# ===========================================================================
 # 7: GET /calls/{unknown} → 404
 # ===========================================================================
 
@@ -479,6 +524,16 @@ class TestCancelCall:
         body = resp.json()
         assert body["status"] == "cancelling"
         assert body["call_id"] == task_id
+
+    def test_cancel_cleans_up_internal_state(self, client, headers):
+        """POST /calls/{id}/cancel removes task from call_rooms after cancel."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+        resp = client.post(f"/calls/{task_id}/cancel", headers=headers)
+        assert resp.status_code == 200
+
+        # After cancel, the task_id should be cleaned up → 404 on GET
+        resp2 = client.get(f"/calls/{task_id}", headers=headers)
+        assert resp2.status_code == 404
 
     def test_cancel_unknown_call_returns_404(self, client, headers):
         """POST /calls/{unknown}/cancel returns 404."""
