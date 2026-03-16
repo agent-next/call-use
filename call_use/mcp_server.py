@@ -253,6 +253,18 @@ async def status(task_id: str) -> str:
         return json.dumps(err)
 
 
+async def _get_agent_identity(lk: LiveKitAPI, room_name: str) -> str:
+    """Look up the agent identity from room metadata."""
+    rooms = await lk.room.list_rooms(ListRoomsRequest(names=[room_name]))
+    if not rooms.rooms:
+        raise ValueError(f"Room {room_name} not found")
+    metadata = json.loads(rooms.rooms[0].metadata or "{}")
+    agent_id = metadata.get("agent_identity")
+    if not agent_id:
+        raise ValueError("Agent not yet initialized")
+    return str(agent_id)
+
+
 @mcp.tool()
 async def cancel(task_id: str) -> str:
     """Cancel an active phone call.
@@ -262,12 +274,14 @@ async def cancel(task_id: str) -> str:
     """
     try:
         async with LiveKitAPI() as lk:
+            agent_id = await _get_agent_identity(lk, task_id)
             await lk.room.send_data(
                 SendDataRequest(
                     room=task_id,
                     data=json.dumps({"type": "cancel"}).encode(),
                     kind=DataPacket.Kind.RELIABLE,
                     topic="backend-commands",
+                    destination_identities=[agent_id],
                 )
             )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})

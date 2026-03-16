@@ -926,6 +926,11 @@ class TestMCPBehavior:
         MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
         MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
+        # Mock room metadata with agent_identity (required by _get_agent_identity)
+        mock_room = MagicMock()
+        mock_room.metadata = json.dumps({"agent_identity": "agent-bdd-test"})
+        mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+
         result_str = await cancel(task_id="call-cancel-test")
         result = json.loads(result_str)
         assert result["status"] == "cancel_requested"
