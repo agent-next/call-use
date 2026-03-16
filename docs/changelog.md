@@ -2,6 +2,16 @@
 
 All notable changes to call-use will be documented in this file.
 
+## [0.1.1] -- 2026-03-16
+
+### Fixed
+
+- Corrected worker command in README (`call-use-worker start` instead of `call-use-worker dev`)
+- Improved phone validation security (Caribbean NPA blocking, premium-rate detection)
+- Hardened rate limiter reliability under concurrent load
+- Fixed MCP server tool descriptions for clarity
+- Documentation consistency improvements across all guides
+
 ## [0.1.0] -- 2026-03-14
 
 ### Added
