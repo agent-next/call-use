@@ -20,11 +20,11 @@ format:
 	ruff format call_use/ tests/
 
 typecheck:
-	mypy call_use/ --ignore-missing-imports
+	mypy call_use/ --ignore-missing-imports --check-untyped-defs
 
 security:
 	bandit -r call_use/ -c pyproject.toml -ll
-	safety check --short-report || true
+	pip-audit --strict
 
 build: clean
 	python3 -m build
