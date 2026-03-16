@@ -91,6 +91,7 @@ class CallErrorCode(str, Enum):
     rate_limited = "rate_limited"
     cancelled = "cancelled"
     worker_not_running = "worker_not_running"
+    configuration_error = "configuration_error"
 
 
 # ---------------------------------------------------------------------------

@@ -267,6 +267,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -336,6 +338,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -387,6 +391,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -452,6 +458,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -545,6 +553,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -641,6 +651,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -702,6 +714,8 @@ class TestCallAgentCallMethod:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -836,6 +850,8 @@ class TestMalformedCallOutcome:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -911,6 +927,8 @@ class TestMalformedCallOutcome:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -972,6 +990,8 @@ class TestTokenTTL:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -1065,6 +1085,8 @@ class TestWorkerNotRunningDetection:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -1115,6 +1137,8 @@ class TestWorkerNotRunningDetection:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -1151,3 +1175,36 @@ class TestWorkerNotRunningDetection:
             asyncio.create_task(_simulate_worker_and_complete())
             outcome = await agent.call()
             assert outcome.disposition == "completed"
+
+
+class TestEnvVarValidation:
+    @pytest.mark.asyncio
+    async def test_missing_all_env_vars_raises_configuration_error(self):
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        with patch.dict(os.environ, {}, clear=True):
+            with pytest.raises(CallError) as exc_info:
+                await agent.call()
+            assert exc_info.value.code == CallErrorCode.configuration_error
+            assert "LIVEKIT_URL" in str(exc_info.value)
+
+    @pytest.mark.asyncio
+    async def test_partial_env_vars_lists_only_missing(self):
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        partial_env = {
+            "LIVEKIT_URL": "ws://localhost",
+            "LIVEKIT_API_KEY": "key",
+        }
+        with patch.dict(os.environ, partial_env, clear=True):
+            with pytest.raises(CallError) as exc_info:
+                await agent.call()
+            msg = str(exc_info.value)
+            assert "LIVEKIT_API_SECRET" in msg
+            assert "LIVEKIT_URL" not in msg
