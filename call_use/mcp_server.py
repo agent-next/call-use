@@ -68,11 +68,15 @@ async def _do_dial(
     # --- Input validation (match REST API constraints) ---
     if len(instructions) > MAX_INSTRUCTIONS_LENGTH:
         return {
-            "error": f"instructions too long ({len(instructions)} chars, max {MAX_INSTRUCTIONS_LENGTH})"
+            "error": (
+                f"instructions too long ({len(instructions)} chars, max {MAX_INSTRUCTIONS_LENGTH})"
+            )
         }
     if not (MIN_TIMEOUT <= timeout <= MAX_TIMEOUT):
         return {
-            "error": f"timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds, got {timeout}"
+            "error": (
+                f"timeout must be between {MIN_TIMEOUT} and {MAX_TIMEOUT} seconds, got {timeout}"
+            )
         }
     if voice_id and voice_id not in VALID_VOICES:
         logger.warning("Invalid voice_id %r, falling back to 'alloy'", voice_id)

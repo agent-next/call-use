@@ -414,9 +414,7 @@ async def test_dial_invalid_voice_id_falls_back_to_alloy(MockLiveKitAPI, MockDis
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-    result = await _do_dial(
-        phone="+12025551234", instructions="test", voice_id="invalid-voice"
-    )
+    result = await _do_dial(phone="+12025551234", instructions="test", voice_id="invalid-voice")
     assert result["status"] == "dispatched"
     # Verify the dispatched metadata used "alloy" as fallback
     dispatch_kwargs = MockDispatchReq.call_args.kwargs
@@ -428,9 +426,7 @@ async def test_dial_invalid_voice_id_falls_back_to_alloy(MockLiveKitAPI, MockDis
 @patch.dict(os.environ, _FULL_ENV)
 async def test_dial_user_info_not_json_serializable_returns_error():
     """_do_dial rejects user_info that cannot be serialized to JSON."""
-    result = await _do_dial(
-        phone="+12025551234", instructions="test", user_info={"bad": object()}
-    )
+    result = await _do_dial(phone="+12025551234", instructions="test", user_info={"bad": object()})
     assert "error" in result
     assert "user_info must be JSON-serializable" in result["error"]
 
