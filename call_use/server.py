@@ -17,6 +17,10 @@ from call_use.phone import validate_caller_id, validate_phone_number
 from call_use.rate_limit import RateLimiter
 
 
+class ResumeRequest(BaseModel):
+    summary: str = ""
+
+
 class InjectRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
 
@@ -260,9 +264,9 @@ def create_app(api_key: str | None = None) -> FastAPI:
         return {"status": "takeover_active", "takeover_token": takeover_token.to_jwt()}
 
     @app.post("/calls/{call_id}/resume", dependencies=[Depends(verify_api_key_dep)])
-    async def resume(call_id: str, body: dict):
+    async def resume(call_id: str, body: ResumeRequest = ResumeRequest()):
         room_name = _get_room_name(call_id)
-        summary = body.get("summary", "")
+        summary = body.summary
         async with _get_call_lock(call_id), LiveKitAPI() as lkapi:
             agent_id = await _get_agent_identity(lkapi, room_name)
             state = await _get_room_state(lkapi, room_name)
