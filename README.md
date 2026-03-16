@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/call-use)](https://pypi.org/project/call-use/)
 [![Tests](https://github.com/agent-next/call-use/actions/workflows/ci.yml/badge.svg)](https://github.com/agent-next/call-use/actions)
-[![Coverage](https://img.shields.io/badge/coverage-100%25-brightgreen)](https://github.com/agent-next/call-use/actions)
+[![Coverage](https://img.shields.io/badge/coverage-100%25_(CI--enforced)-brightgreen)](https://github.com/agent-next/call-use/actions)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://pypi.org/project/call-use/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
@@ -79,7 +79,7 @@ Set these environment variables (or use a `.env` file):
 The worker process handles the actual voice pipeline:
 
 ```bash
-call-use-worker start
+call-use-worker dev
 ```
 
 ### Make a call
@@ -124,6 +124,7 @@ Events stream to stderr in real-time; structured JSON result goes to stdout.
         "LIVEKIT_API_KEY": "...",
         "LIVEKIT_API_SECRET": "...",
         "SIP_TRUNK_ID": "...",
+        "DEEPGRAM_API_KEY": "your-deepgram-api-key",
         "OPENAI_API_KEY": "..."
       }
     }
@@ -160,9 +161,14 @@ Exposes four async tools: `dial` (returns immediately), `status`, `cancel`, `res
 Pause the AI agent, join the call yourself, then hand control back:
 
 ```python
+call_task = asyncio.create_task(agent.call())
+
+# ... when a human needs to take over:
 token = await agent.takeover()   # returns LiveKit JWT
 # ... join the room with the token, talk to the callee ...
 await agent.resume()             # agent takes over again
+
+result = await call_task
 ```
 
 ## Approval Flow
@@ -174,7 +180,7 @@ agent = CallAgent(
     phone="+18001234567",
     instructions="Cancel my subscription. If they offer a discount, ask me first.",
     approval_required=True,
-    on_approval=lambda data: input(f"Approve '{data['details']}'? [y/n]: "),
+    on_approval=lambda data: "approved" if input(f"Approve '{data['details']}'? [y/n]: ").strip().lower() == "y" else "rejected",
 )
 ```
 
@@ -230,6 +236,16 @@ make check  # lint + typecheck + test (100% coverage) + build
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## Troubleshooting
+
+| Problem | Cause | Fix |
+|---------|-------|-----|
+| `MissingEnvironmentError` on startup | One or more required env vars are unset | Ensure all six variables from the [Configuration](#configuration) table are exported (or present in your `.env` file). Run `call-use doctor` to check. |
+| LiveKit connection failed / timeout | `LIVEKIT_URL` is wrong or the LiveKit server is unreachable | Verify `LIVEKIT_URL` starts with `wss://`, and that the LiveKit server (Cloud or self-hosted) is running and reachable from your network. |
+| Worker not picking up calls | The worker process is not running | Start it with `call-use-worker dev` (development) or `call-use-worker` (production) in a separate terminal. |
+| Call times out immediately | SIP trunk is misconfigured in LiveKit | Double-check `SIP_TRUNK_ID` matches an active Twilio SIP trunk in your LiveKit dashboard. Ensure the trunk's origination URI points to your LiveKit instance. |
+| `PermissionError` writing log files | `~/.call-use/logs/` has restrictive permissions | Run `chmod 755 ~/.call-use/logs/` or set `CALL_USE_LOG_DIR` to a writable directory. |
 
 ## Known Limitations
 
