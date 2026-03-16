@@ -103,8 +103,7 @@ async def call_2_request_credit_increase(current_balance: float):
 
     outcome = await agent.call()
     print(f"  Disposition: {outcome.disposition.value}")
-    if outcome.summary:
-        print(f"  Summary: {outcome.summary}")
+    print(f"  Transcript: {len(outcome.transcript)} turns")
 
 
 async def main():

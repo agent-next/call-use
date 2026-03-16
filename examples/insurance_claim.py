@@ -75,8 +75,7 @@ async def main():
     print(f"Duration:     {outcome.duration_seconds:.1f}s")
     print(f"Disposition:  {outcome.disposition.value}")
     print(f"Claim Number: {claim_number or '(not captured — check transcript)'}")
-    if outcome.summary:
-        print(f"Summary:      {outcome.summary}")
+    print(f"Transcript:   {len(outcome.transcript)} turns")
 
 
 if __name__ == "__main__":

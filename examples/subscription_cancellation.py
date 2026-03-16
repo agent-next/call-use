@@ -76,8 +76,7 @@ async def main():
     print(f"Offers received: {len(retention_offers)}")
     for i, offer in enumerate(retention_offers, 1):
         print(f"  Offer {i}: {offer}")
-    if outcome.summary:
-        print(f"Summary:         {outcome.summary}")
+    print(f"Transcript:      {len(outcome.transcript)} turns")
 
 
 if __name__ == "__main__":

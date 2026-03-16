@@ -22,6 +22,7 @@ from call_use import CallAgent
 outcome = await CallAgent(
     phone="+18001234567",
     instructions="Cancel my internet subscription",
+    approval_required=False,
 ).call()
 
 print(outcome.disposition)   # "completed"

@@ -58,7 +58,6 @@ async def _run_call(call_id: str, req: CallRequest):
         _calls[call_id]["outcome"] = {
             "disposition": outcome.disposition.value,
             "duration_seconds": outcome.duration_seconds,
-            "summary": outcome.summary,
             "transcript": outcome.transcript,
         }
     except Exception as exc:
