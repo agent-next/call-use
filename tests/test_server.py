@@ -4,6 +4,7 @@
 
 import os
 import sys
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -62,6 +63,56 @@ class TestCreateCallValid:
         assert "livekit_token" in body
         assert "room_name" in body
         assert "status" in body
+
+
+# ===========================================================================
+# 1b: Monitor token has explicit TTL
+# ===========================================================================
+
+
+class TestMonitorTokenTTL:
+    def test_monitor_token_has_2h_ttl(self, client, headers):
+        """POST /calls sets a 2-hour TTL on the monitor token."""
+        mock_token_instance = MagicMock()
+        mock_token_instance.to_jwt.return_value = "fake-jwt-token"
+
+        with patch.object(
+            sys.modules["livekit"].api, "AccessToken", return_value=mock_token_instance
+        ):
+            resp = client.post(
+                "/calls",
+                json={
+                    "phone_number": "+12025551234",
+                    "instructions": "Call the dentist",
+                },
+                headers=headers,
+            )
+
+        assert resp.status_code == 200
+        mock_token_instance.with_ttl.assert_called_once_with(timedelta(hours=2))
+
+
+# ===========================================================================
+# 1c: Takeover token has explicit TTL
+# ===========================================================================
+
+
+class TestTakeoverTokenTTL:
+    def test_takeover_token_has_15m_ttl(self, client, headers):
+        """POST /calls/{id}/takeover sets a 15-minute TTL on the takeover token."""
+        task_id, mock_room, lkapi = _create_call_and_setup_mocks(client, headers)
+
+        takeover_room = MagicMock()
+        takeover_room.metadata = '{"state": "human_takeover", "agent_identity": "agent-test123"}'
+        lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[takeover_room]))
+
+        mock_token = MagicMock()
+        mock_token.to_jwt.return_value = "takeover-jwt-token"
+        with patch.object(sys.modules["livekit"].api, "AccessToken", return_value=mock_token):
+            resp = client.post(f"/calls/{task_id}/takeover", headers=headers)
+
+        assert resp.status_code == 200
+        mock_token.with_ttl.assert_called_once_with(timedelta(minutes=15))
 
 
 # ===========================================================================

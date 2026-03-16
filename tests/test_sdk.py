@@ -5,6 +5,7 @@
 import asyncio
 import json
 import os
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -747,3 +748,82 @@ class TestCallAgentCallMethod:
 
             jwt = await agent.takeover()
             assert jwt == "human-jwt-token"
+
+
+class TestTokenTTL:
+    """Verify that SDK tokens are created with explicit TTL values."""
+
+    async def test_call_monitor_token_has_2h_ttl(self):
+        """call() creates a monitor token with 2-hour TTL."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            timeout_seconds=0,
+        )
+
+        mock_room = MagicMock()
+        mock_room.on = lambda event_name: lambda fn: fn
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            mock_token_instance = MockToken.return_value
+            mock_token_instance.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await agent.call()
+
+            mock_token_instance.with_ttl.assert_called_once_with(timedelta(hours=2))
+
+    async def test_takeover_token_has_15min_ttl(self):
+        """takeover() creates a human token with 15-minute TTL."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+        )
+        agent._room_name = "test-room"
+
+        mock_api = AsyncMock()
+        mock_api.room.list_rooms = AsyncMock(
+            return_value=MagicMock(rooms=[MagicMock(metadata='{"agent_identity": "agent-abc"}')])
+        )
+        mock_api.room.send_data = AsyncMock()
+
+        with (
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                },
+            ),
+        ):
+            mock_token_instance = MockToken.return_value
+            mock_token_instance.to_jwt.return_value = "human-jwt-token"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            await agent.takeover()
+
+            mock_token_instance.with_ttl.assert_called_once_with(timedelta(minutes=15))
