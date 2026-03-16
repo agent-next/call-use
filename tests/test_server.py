@@ -271,9 +271,7 @@ class TestGetCallEndedIdempotent:
         lkapi_instance = sys.modules["livekit.api"].LiveKitAPI.return_value
         lkapi_instance.room = MagicMock()
         lkapi_instance.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
-        lkapi_instance.room.list_participants = AsyncMock(
-            return_value=MagicMock(participants=[])
-        )
+        lkapi_instance.room.list_participants = AsyncMock(return_value=MagicMock(participants=[]))
 
         resp = client.get(f"/calls/{task_id}", headers=headers)
         assert resp.status_code == 200
