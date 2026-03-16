@@ -255,11 +255,13 @@ class _LiveKitCallAgent(Agent):
 
         def _handle_data(dp):
             task = asyncio.create_task(self._on_data_received(dp))
-            task.add_done_callback(
-                lambda t: (
-                    t.exception() and logger.error("data handler error", exc_info=t.exception())
-                )
-            )
+
+            def _log_task_error(t: asyncio.Task) -> None:
+                exc = t.exception()
+                if exc:
+                    logger.error("data handler error", exc_info=exc)
+
+            task.add_done_callback(_log_task_error)
 
         self._room.on("data_received", _handle_data)
         await self._set_state(CallStateEnum.connected)
@@ -639,7 +641,7 @@ class _LiveKitCallAgent(Agent):
                 if getattr(msg, "role", None) != "assistant":
                     return
                 text = msg.text_content if hasattr(msg, "text_content") else str(msg)
-                if text:
+                if text and self._evidence:
                     asyncio.create_task(self._evidence.emit_transcript("agent", text))
 
             @session.on("function_tools_executed")
@@ -653,7 +655,7 @@ class _LiveKitCallAgent(Agent):
                             keys = args.get("keys", "")
                         else:
                             keys = ""
-                        if keys:
+                        if keys and self._evidence:
                             asyncio.create_task(self._evidence.emit_dtmf(keys))
 
         # Initial greeting — called AFTER session.start(), NOT in on_enter()
