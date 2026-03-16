@@ -182,7 +182,7 @@ async def dial(
             timeout=timeout,
         )
         return json.dumps(result, indent=2)
-    except Exception as e:
+    except Exception:
         logger.error("dial tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details."})
 
@@ -197,9 +197,10 @@ async def status(task_id: str) -> str:
     try:
         result = await _do_status(task_id)
         return json.dumps(result, indent=2)
-    except Exception as e:
+    except Exception:
         logger.error("status tool error", exc_info=True)
-        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 @mcp.tool()
@@ -220,9 +221,10 @@ async def cancel(task_id: str) -> str:
                 )
             )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})
-    except Exception as e:
+    except Exception:
         logger.error("cancel tool error", exc_info=True)
-        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 @mcp.tool()
@@ -237,9 +239,10 @@ async def result(task_id: str) -> str:
     try:
         outcome = await _do_result(task_id)
         return json.dumps(outcome, indent=2)
-    except Exception as e:
+    except Exception:
         logger.error("result tool error", exc_info=True)
-        return json.dumps({"error": "Internal error. Check server logs for details.", "task_id": task_id})
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 def main():
