@@ -22,6 +22,7 @@ from livekit.api import (
 )
 from mcp.server import FastMCP
 
+from call_use.models import CallError, CallErrorCode
 from call_use.phone import validate_caller_id, validate_phone_number
 
 logger = logging.getLogger(__name__)
@@ -215,6 +216,15 @@ async def dial(
             timeout=timeout,
         )
         return json.dumps(result, indent=2)
+    except CallError as e:
+        if e.code == CallErrorCode.worker_not_running:
+            return json.dumps(
+                {
+                    "error": "No worker available. Start the worker: call-use-worker start",
+                    "help": "Run 'call-use-worker start' in another terminal before dialing.",
+                }
+            )
+        return json.dumps({"error": "Call failed", "code": str(e.code.value)})
     except Exception:
         logger.error("dial tool error", exc_info=True)
         return json.dumps({"error": "Internal error. Check server logs for details."})

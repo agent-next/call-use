@@ -8,6 +8,7 @@ import pytest
 from click.testing import CliRunner
 
 from call_use.cli import main
+from call_use.models import CallError, CallErrorCode
 
 pytestmark = pytest.mark.unit
 
@@ -549,3 +550,35 @@ class TestRunCall:
         call_kwargs = MockAgent.call_args.kwargs
         assert call_kwargs["approval_required"] is True
         assert call_kwargs["on_approval"] is not None
+
+
+# ===========================================================================
+# Worker not running — CallError handling
+# ===========================================================================
+
+
+@patch("call_use.cli._run_call")
+def test_dial_worker_not_running_shows_actionable_error(mock_run):
+    """CallError with worker_not_running shows clear start instructions."""
+    mock_run.side_effect = CallError(
+        code=CallErrorCode.worker_not_running,
+        message="No call-use-worker picked up the job within 10s.",
+    )
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test"])
+    assert result.exit_code == 1
+    assert "No worker available" in result.output
+    assert "call-use-worker start" in result.output
+
+
+@patch("call_use.cli._run_call")
+def test_dial_other_call_error_shows_generic_message(mock_run):
+    """CallError with a non-worker code shows generic error message."""
+    mock_run.side_effect = CallError(
+        code=CallErrorCode.dial_failed,
+        message="SIP trunk not responding",
+    )
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test"])
+    assert result.exit_code == 1
+    assert "SIP trunk not responding" in result.output
