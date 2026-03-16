@@ -242,9 +242,9 @@ class _LiveKitCallAgent(Agent):
                 return
             except Exception as e:
                 if attempt == 0:
-                    logger.warning(f"Metadata write failed, retrying: {e}")
+                    logger.warning("Metadata write failed, retrying: %s", e)
                 else:
-                    logger.error(f"Metadata write failed after retry: {e}")
+                    logger.error("Metadata write failed after retry: %s", e)
 
     # ---- Lifecycle hooks ----
 
@@ -330,7 +330,7 @@ class _LiveKitCallAgent(Agent):
             await self._update_metadata("human_takeover")
             return
         if self._current_state not in (CallStateEnum.connected, CallStateEnum.awaiting_approval):
-            logger.warning(f"Ignoring takeover in state '{self._current_state.value}'")
+            logger.warning("Ignoring takeover in state '%s'", self._current_state.value)
             return
         if self._current_state == CallStateEnum.awaiting_approval and self._approval_event:
             self._approval_result = "cancelled"
@@ -344,7 +344,7 @@ class _LiveKitCallAgent(Agent):
 
     async def _handle_resume(self, payload):
         if self._current_state != CallStateEnum.human_takeover:
-            logger.warning(f"Ignoring resume in state '{self._current_state.value}'")
+            logger.warning("Ignoring resume in state '%s'", self._current_state.value)
             return None
         summary = payload.get("summary", "")
         await self._set_state(CallStateEnum.connected)
@@ -364,7 +364,7 @@ class _LiveKitCallAgent(Agent):
 
     async def _handle_inject(self, payload):
         if self._current_state != CallStateEnum.connected:
-            logger.info(f"Inject blocked in state '{self._current_state.value}'")
+            logger.info("Inject blocked in state '%s'", self._current_state.value)
             return None
         text = payload.get("text", "")
         return (
@@ -374,13 +374,14 @@ class _LiveKitCallAgent(Agent):
 
     async def _handle_approval_response(self, payload):
         if self._current_state != CallStateEnum.awaiting_approval or not self._approval_event:
-            logger.warning(f"Ignoring approval response in state '{self._current_state.value}'")
+            logger.warning("Ignoring approval response in state '%s'", self._current_state.value)
             return
         resp_id = payload.get("approval_id", "")
         if resp_id != self._approval_id:
             logger.warning(
-                f"Ignoring approval response with wrong ID "
-                f"(got={resp_id!r}, want={self._approval_id!r})"
+                "Ignoring approval response with wrong ID (got=%r, want=%r)",
+                resp_id,
+                self._approval_id,
             )
             return
         raw = payload.get("type")
@@ -624,7 +625,7 @@ class _LiveKitCallAgent(Agent):
             ),
         )
 
-        logger.info(f"Agent identity: {ctx.room.local_participant.identity}")
+        logger.info("Agent identity: %s", ctx.room.local_participant.identity)
 
         # Wire agent speech into evidence (Step 5c)
         # In livekit-agents v1.4.5, agent speech is captured via the
@@ -698,7 +699,7 @@ class _LiveKitCallAgent(Agent):
         """Cancel the call after timeout_seconds."""
         try:
             await asyncio.sleep(timeout_seconds)
-            logger.warning(f"Call timed out after {timeout_seconds}s")
+            logger.warning("Call timed out after %ss", timeout_seconds)
             await self.finalize_and_publish(DispositionEnum.timeout)
         except asyncio.CancelledError:
             pass

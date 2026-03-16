@@ -13,8 +13,8 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install ruff
@@ -24,8 +24,8 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - uses: actions/cache@v5
@@ -41,8 +41,8 @@ jobs:
       matrix:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
       - uses: actions/cache@v5
@@ -51,7 +51,7 @@ jobs:
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('pyproject.toml') }}
       - run: pip install -e ".[dev]"
       - run: pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-report=xml --cov-fail-under=100 --junitxml=test-results.xml
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results-${{ matrix.python-version }}
@@ -62,26 +62,26 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install bandit safety
       - run: bandit -r call_use/ -c pyproject.toml -ll
-      - run: safety check --short-report || true
+      - run: safety check --short-report
 
   build:
     runs-on: ubuntu-latest
     needs: [lint, typecheck, test]
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install build twine
       - run: python -m build
       - run: twine check dist/*
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
