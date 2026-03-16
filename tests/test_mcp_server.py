@@ -168,10 +168,15 @@ async def test_do_dial_livekit_connection_error(MockLiveKitAPI):
 @pytest.mark.asyncio
 @patch("call_use.mcp_server.LiveKitAPI")
 async def test_cancel_sends_command(MockLiveKitAPI):
-    """cancel tool sends cancel command via data channel."""
+    """cancel tool sends cancel command targeted to agent, not broadcast."""
     mock_api = AsyncMock()
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    # Mock room metadata with agent_identity
+    mock_room = MagicMock()
+    mock_room.metadata = json.dumps({"agent_identity": "agent-abc123"})
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
 
     from call_use.mcp_server import cancel
 
@@ -179,6 +184,11 @@ async def test_cancel_sends_command(MockLiveKitAPI):
     result = json.loads(result_str)
     assert result["status"] == "cancel_requested"
     mock_api.room.send_data.assert_called_once()
+
+    # Verify the cancel targets only the agent
+    call_args = mock_api.room.send_data.call_args
+    send_req = call_args[0][0]
+    assert send_req.destination_identities == ["agent-abc123"]
 
 
 @pytest.mark.asyncio
@@ -247,6 +257,9 @@ async def test_result_tool_wraps_exception(MockLiveKitAPI):
 async def test_cancel_tool_wraps_exception(MockLiveKitAPI):
     """cancel tool returns generic error JSON on exception."""
     mock_api = AsyncMock()
+    mock_room = MagicMock()
+    mock_room.metadata = json.dumps({"agent_identity": "agent-xyz"})
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
     mock_api.room.send_data = AsyncMock(side_effect=Exception("room gone"))
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
     MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
