@@ -125,8 +125,13 @@ class CallAgent:
                         "Failed to parse CallOutcome (raw data: %s): %s",
                         event.data, exc, exc_info=True,
                     )
+                    fallback_id = (
+                        event.data.get("task_id", "unknown")
+                        if isinstance(event.data, dict)
+                        else "unknown"
+                    )
                     outcome_holder[0] = CallOutcome(
-                        task_id=event.data.get("task_id", "unknown") if isinstance(event.data, dict) else "unknown",
+                        task_id=fallback_id,
                         transcript=[],
                         events=[],
                         duration_seconds=0,

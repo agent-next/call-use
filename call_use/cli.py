@@ -217,7 +217,8 @@ def doctor():
             click.echo(click.style(f"  \u2717 {msg}", fg="red"))
             failed += 1
     else:
-        click.echo(click.style("  \u2717 LiveKit connectivity skipped (missing credentials)", fg="red"))
+        msg = "LiveKit connectivity skipped (missing credentials)"
+        click.echo(click.style(f"  \u2717 {msg}", fg="red"))
         failed += 1
 
     # 3. Summary

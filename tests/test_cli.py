@@ -403,8 +403,16 @@ class TestDoctor:
         assert "7 passed, 0 failed" in result.output
         assert "LiveKit connection OK" in result.output
 
-    @patch("call_use.cli._check_livekit_connectivity", return_value=(True, "LiveKit connection OK"))
-    @patch.dict(os.environ, {k: v for k, v in _ALL_DOCTOR_ENV.items() if k != "DEEPGRAM_API_KEY"}, clear=True)
+    @patch(
+        "call_use.cli._check_livekit_connectivity",
+        return_value=(True, "LiveKit connection OK"),
+    )
+    @patch.dict(
+        os.environ,
+        {k: v for k, v in _ALL_DOCTOR_ENV.items()
+         if k != "DEEPGRAM_API_KEY"},
+        clear=True,
+    )
     def test_doctor_missing_vars_shows_failure(self, mock_lk):
         """Missing DEEPGRAM_API_KEY → exit 1, shows failure."""
         runner = CliRunner()
@@ -413,7 +421,13 @@ class TestDoctor:
         assert "DEEPGRAM_API_KEY missing" in result.output
         assert "1 failed" in result.output
 
-    @patch("call_use.cli._check_livekit_connectivity", return_value=(False, "LiveKit connection failed: Connection refused"))
+    @patch(
+        "call_use.cli._check_livekit_connectivity",
+        return_value=(
+            False,
+            "LiveKit connection failed: Connection refused",
+        ),
+    )
     @patch.dict(os.environ, _ALL_DOCTOR_ENV, clear=True)
     def test_doctor_livekit_connection_failure(self, mock_lk):
         """LiveKit connection failure → shows error, doesn't crash, exit 1."""
@@ -425,7 +439,10 @@ class TestDoctor:
 
     @patch.dict(
         os.environ,
-        {k: v for k, v in _ALL_DOCTOR_ENV.items() if k not in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")},
+        {k: v for k, v in _ALL_DOCTOR_ENV.items()
+         if k not in (
+             "LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET",
+         )},
         clear=True,
     )
     def test_doctor_livekit_skipped_when_creds_missing(self):
