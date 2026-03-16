@@ -22,6 +22,13 @@ class EvidencePipeline:
     def __init__(
         self, task: CallTask, room_name: str | None = None, agent_identity: str | None = None
     ):
+        """Initialize the evidence pipeline for recording call events.
+
+        Args:
+            task: The call task configuration this pipeline records evidence for.
+            room_name: Optional LiveKit room name for metadata writes.
+            agent_identity: Optional agent participant identity.
+        """
         self.task = task
         self._room_name = room_name  # For room metadata writes; None in tests
         self._agent_identity = agent_identity
@@ -65,9 +72,11 @@ class EvidencePipeline:
         )
 
     async def emit_dtmf(self, keys: str):
+        """Emit a DTMF tone event with the pressed digits."""
         await self.emit(CallEvent(type=CallEventType.dtmf, data={"keys": keys}))
 
     async def emit_approval_request(self, approval_id: str, details: str, agent_identity: str):
+        """Emit an event when the agent requests human approval."""
         await self.emit(
             CallEvent(
                 type=CallEventType.approval_request,
@@ -80,6 +89,7 @@ class EvidencePipeline:
         )
 
     async def emit_approval_response(self, approval_id: str, result: str):
+        """Emit an event recording the approval decision."""
         await self.emit(
             CallEvent(
                 type=CallEventType.approval_response,
@@ -88,12 +98,15 @@ class EvidencePipeline:
         )
 
     async def emit_takeover(self):
+        """Emit an event when a human takes over the call."""
         await self.emit(CallEvent(type=CallEventType.takeover, data={}))
 
     async def emit_resume(self):
+        """Emit an event when the agent resumes control after takeover."""
         await self.emit(CallEvent(type=CallEventType.resume, data={}))
 
     async def emit_error(self, code: str, message: str):
+        """Emit an error event for non-fatal issues during the call."""
         await self.emit(
             CallEvent(
                 type=CallEventType.error,
