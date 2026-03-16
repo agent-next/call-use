@@ -197,9 +197,9 @@ def create_app(api_key: str | None = None) -> FastAPI:
             await lkapi.room.send_data(
                 SendDataRequest(
                     room=room_name,
-                    data=json.dumps(
-                        {"type": "inject_context", "text": body.message}
-                    ).encode("utf-8"),
+                    data=json.dumps({"type": "inject_context", "text": body.message}).encode(
+                        "utf-8"
+                    ),
                     kind=DataPacket.Kind.RELIABLE,
                     topic="backend-commands",
                     destination_identities=[agent_id],
