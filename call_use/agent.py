@@ -447,9 +447,9 @@ class _LiveKitCallAgent(Agent):
                     self.session.output.set_audio_enabled(True)
                     self.session.input.set_audio_enabled(True)
                     await self._update_metadata("connected")
-            self._approval_event = None
-            self._approval_result = None
-            self._approval_id = None
+                self._approval_event = None
+                self._approval_result = None
+                self._approval_id = None
 
     # ---- Hang-up tool ----
 
