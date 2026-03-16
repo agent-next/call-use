@@ -394,7 +394,7 @@ def _prompt_key(
             return
 
         validator = key_def.get("validate")
-        if validator and not validator(value):
+        if validator and callable(validator) and not validator(value):
             click.echo(click.style(f"  \u2717 {key_def['error']}", fg="red"))
             continue
 
