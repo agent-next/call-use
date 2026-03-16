@@ -378,6 +378,77 @@ async def test_dial_tool_success(MockLiveKitAPI):
 # ===========================================================================
 
 
+# ===========================================================================
+# Input validation tests (security fix — match REST API constraints)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_dial_instructions_too_long_returns_error():
+    """_do_dial rejects instructions exceeding 5000 chars."""
+    result = await _do_dial(phone="+12025551234", instructions="x" * 5001)
+    assert "error" in result
+    assert "instructions too long" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_dial_timeout_below_minimum_returns_error():
+    """_do_dial rejects timeout below 30 seconds."""
+    result = await _do_dial(phone="+12025551234", instructions="test", timeout=10)
+    assert "error" in result
+    assert "timeout must be between" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_dial_timeout_above_maximum_returns_error():
+    """_do_dial rejects timeout above 3600 seconds."""
+    result = await _do_dial(phone="+12025551234", instructions="test", timeout=7200)
+    assert "error" in result
+    assert "timeout must be between" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+@patch("call_use.mcp_server.CreateAgentDispatchRequest")
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_dial_invalid_voice_id_falls_back_to_alloy(MockLiveKitAPI, MockDispatchReq):
+    """_do_dial falls back to 'alloy' for invalid voice_id (matches agent.py)."""
+    mock_api = AsyncMock()
+    mock_api.room.create_room.return_value = MagicMock()
+    mock_api.agent_dispatch.create_dispatch.return_value = MagicMock()
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    result = await _do_dial(phone="+12025551234", instructions="test", voice_id="invalid-voice")
+    assert result["status"] == "dispatched"
+    # Verify the dispatched metadata used "alloy" as fallback
+    dispatch_kwargs = MockDispatchReq.call_args.kwargs
+    metadata = json.loads(dispatch_kwargs["metadata"])
+    assert metadata["voice_id"] == "alloy"
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_dial_user_info_not_json_serializable_returns_error():
+    """_do_dial rejects user_info that cannot be serialized to JSON."""
+    result = await _do_dial(phone="+12025551234", instructions="test", user_info={"bad": object()})
+    assert "error" in result
+    assert "user_info must be JSON-serializable" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
+async def test_dial_user_info_too_large_returns_error():
+    """_do_dial rejects user_info exceeding 10000 chars serialized."""
+    big_info = {"data": "x" * 10000}
+    result = await _do_dial(phone="+12025551234", instructions="test", user_info=big_info)
+    assert "error" in result
+    assert "user_info too large" in result["error"]
+
+
 @pytest.mark.asyncio
 @patch.dict(os.environ, _FULL_ENV)
 async def test_do_dial_rejects_invalid_phone():
