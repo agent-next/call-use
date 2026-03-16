@@ -79,7 +79,7 @@ Set these environment variables (or use a `.env` file):
 The worker process handles the actual voice pipeline:
 
 ```bash
-call-use-worker dev
+call-use-worker start
 ```
 
 ### Make a call
@@ -243,7 +243,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 |---------|-------|-----|
 | `MissingEnvironmentError` on startup | One or more required env vars are unset | Ensure all six variables from the [Configuration](#configuration) table are exported (or present in your `.env` file). Run `call-use doctor` to check. |
 | LiveKit connection failed / timeout | `LIVEKIT_URL` is wrong or the LiveKit server is unreachable | Verify `LIVEKIT_URL` starts with `wss://`, and that the LiveKit server (Cloud or self-hosted) is running and reachable from your network. |
-| Worker not picking up calls | The worker process is not running | Start it with `call-use-worker dev` (development) or `call-use-worker` (production) in a separate terminal. |
+| Worker not picking up calls | The worker process is not running | Start it with `call-use-worker start` in a separate terminal. |
 | Call times out immediately | SIP trunk is misconfigured in LiveKit | Double-check `SIP_TRUNK_ID` matches an active Twilio SIP trunk in your LiveKit dashboard. Ensure the trunk's origination URI points to your LiveKit instance. |
 | `PermissionError` writing log files | `~/.call-use/logs/` has restrictive permissions | Run `chmod 755 ~/.call-use/logs/` or set `CALL_USE_LOG_DIR` to a writable directory. |
 
