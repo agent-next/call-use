@@ -2,6 +2,7 @@
 
 pip install call-use langchain-core
 """
+
 import json
 import subprocess
 
@@ -17,14 +18,21 @@ def phone_call(phone: str, instructions: str, user_info: str = "{}") -> str:
         instructions: What to accomplish on the call
         user_info: JSON string with context (e.g., '{"name": "Alice"}')
     """
-    result = subprocess.run(
-        ["call-use", "dial", phone, "-i", instructions, "-u", user_info],
-        capture_output=True, text=True, timeout=660,
-    )
+    try:
+        result = subprocess.run(
+            ["call-use", "dial", phone, "-i", instructions, "-u", user_info],
+            capture_output=True,
+            text=True,
+            timeout=660,
+        )
+    except subprocess.TimeoutExpired:
+        return json.dumps({"error": "Call timed out after 660 seconds"})
     if result.returncode == 2:
         return json.dumps({"error": f"Input error: {result.stderr.strip()}"})
     if result.returncode != 0 and not result.stdout.strip():
-        return json.dumps({"error": f"Call failed (exit {result.returncode}): {result.stderr.strip()}"})
+        return json.dumps(
+            {"error": f"Call failed (exit {result.returncode}): {result.stderr.strip()}"}
+        )
     return result.stdout
 
 

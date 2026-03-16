@@ -6,18 +6,19 @@ Defines a PhoneCallTool and wires it into a two-agent crew:
 
 pip install call-use crewai
 """
+
 import json
 import subprocess
 from typing import Type
 
-from crewai import Agent, Crew, Task
+from crewai import Agent
 from crewai.tools import BaseTool
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Tool definition
 # ---------------------------------------------------------------------------
+
 
 class PhoneCallInput(BaseModel):
     phone: str = Field(description="Target phone number in E.164 format, e.g. +18005551234")
@@ -35,14 +36,21 @@ class PhoneCallTool(BaseTool):
     args_schema: Type[BaseModel] = PhoneCallInput
 
     def _run(self, phone: str, instructions: str, user_info: str = "{}") -> str:
-        result = subprocess.run(
-            ["call-use", "dial", phone, "-i", instructions, "-u", user_info],
-            capture_output=True, text=True, timeout=660,
-        )
+        try:
+            result = subprocess.run(
+                ["call-use", "dial", phone, "-i", instructions, "-u", user_info],
+                capture_output=True,
+                text=True,
+                timeout=660,
+            )
+        except subprocess.TimeoutExpired:
+            return json.dumps({"error": "Call timed out after 660 seconds"})
         if result.returncode == 2:
             return json.dumps({"error": f"Input error: {result.stderr.strip()}"})
         if result.returncode != 0 and not result.stdout.strip():
-            return json.dumps({"error": f"Call failed (exit {result.returncode}): {result.stderr.strip()}"})
+            return json.dumps(
+                {"error": f"Call failed (exit {result.returncode}): {result.stderr.strip()}"}
+            )
         return result.stdout
 
 
