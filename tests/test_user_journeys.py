@@ -237,6 +237,7 @@ class TestCallOutcomeUsability:
             "voicemail",
             "timeout",
             "cancelled",
+            "error",
         }
         actual = {d.value for d in DispositionEnum}
         assert actual == expected

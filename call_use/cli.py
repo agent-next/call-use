@@ -157,3 +157,71 @@ def dial(phone, instructions, user_info, caller_id, voice_id, timeout, approval_
     expected_outcomes = {"completed", "voicemail", "no_answer", "busy"}
     if disposition not in expected_outcomes:
         sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
+# doctor command
+# ---------------------------------------------------------------------------
+
+_DOCTOR_ENV_VARS = {
+    "LIVEKIT_URL": "LiveKit server URL",
+    "LIVEKIT_API_KEY": "LiveKit API key",
+    "LIVEKIT_API_SECRET": "LiveKit API secret",
+    "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
+    "OPENAI_API_KEY": "OpenAI API key",
+    "DEEPGRAM_API_KEY": "Deepgram API key",
+}
+
+
+def _check_livekit_connectivity() -> tuple[bool, str]:
+    """Try to list rooms on LiveKit. Returns (ok, message)."""
+    try:
+        from livekit.api import LiveKitAPI
+
+        async def _probe():
+            async with LiveKitAPI() as lkapi:
+                await lkapi.room.list_rooms()
+
+        asyncio.run(_probe())
+        return True, "LiveKit connection OK"
+    except Exception as e:
+        return False, f"LiveKit connection failed: {e}"
+
+
+@main.command()
+def doctor():
+    """Check your environment and connectivity for common issues."""
+    from dotenv import load_dotenv
+
+    load_dotenv()
+
+    passed = 0
+    failed = 0
+
+    # 1. Environment variables
+    for var, description in _DOCTOR_ENV_VARS.items():
+        if os.environ.get(var):
+            click.echo(click.style(f"  \u2713 {var} set", fg="green"))
+            passed += 1
+        else:
+            click.echo(click.style(f"  \u2717 {var} missing", fg="red"))
+            failed += 1
+
+    # 2. LiveKit connectivity (only if URL + credentials are present)
+    if all(os.environ.get(v) for v in ("LIVEKIT_URL", "LIVEKIT_API_KEY", "LIVEKIT_API_SECRET")):
+        ok, msg = _check_livekit_connectivity()
+        if ok:
+            click.echo(click.style(f"  \u2713 {msg}", fg="green"))
+            passed += 1
+        else:
+            click.echo(click.style(f"  \u2717 {msg}", fg="red"))
+            failed += 1
+    else:
+        msg = "LiveKit connectivity skipped (missing credentials)"
+        click.echo(click.style(f"  \u2717 {msg}", fg="red"))
+        failed += 1
+
+    # 3. Summary
+    click.echo()
+    click.echo(f"  {passed} passed, {failed} failed")
+    sys.exit(0 if failed == 0 else 1)

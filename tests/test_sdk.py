@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from call_use.models import DispositionEnum
 from call_use.sdk import CallAgent
 
 pytestmark = pytest.mark.unit
@@ -748,6 +749,135 @@ class TestCallAgentCallMethod:
 
             jwt = await agent.takeover()
             assert jwt == "human-jwt-token"
+
+
+class TestMalformedCallOutcome:
+    async def test_malformed_call_outcome_returns_error_disposition(self):
+        """When CallOutcome parsing fails, disposition should be 'error' not 'timeout'."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            on_event=lambda e: None,
+        )
+
+        mock_room = MagicMock()
+        data_handler = None
+
+        def capture_handler(event_name):
+            def decorator(fn):
+                nonlocal data_handler
+                data_handler = fn
+                return fn
+
+            return decorator
+
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            async def _simulate_malformed_complete():
+                await asyncio.sleep(0.05)
+                if data_handler:
+                    dp = MagicMock()
+                    dp.topic = "call-events"
+                    # call_complete event with malformed data (missing required fields)
+                    dp.data = json.dumps(
+                        {
+                            "type": "call_complete",
+                            "data": {
+                                "task_id": "test-malformed",
+                                # Missing: transcript, events, duration_seconds, disposition
+                            },
+                        }
+                    ).encode()
+                    data_handler(dp)
+
+            asyncio.create_task(_simulate_malformed_complete())
+            outcome = await agent.call()
+            assert outcome is not None
+            assert outcome.disposition == DispositionEnum.error
+            assert outcome.disposition != DispositionEnum.timeout
+            assert outcome.task_id == "test-malformed"
+
+    async def test_malformed_call_event_is_skipped(self):
+        """When CallEvent parsing fails, event is skipped without crashing."""
+        agent = CallAgent(
+            phone="+12025551234",
+            instructions="Test call",
+            approval_required=False,
+            timeout_seconds=0,
+        )
+
+        mock_room = MagicMock()
+        data_handler = None
+
+        def capture_handler(event_name):
+            def decorator(fn):
+                nonlocal data_handler
+                data_handler = fn
+                return fn
+
+            return decorator
+
+        mock_room.on = capture_handler
+        mock_room.connect = AsyncMock()
+        mock_room.disconnect = AsyncMock()
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.agent_dispatch.create_dispatch = AsyncMock()
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+
+        with (
+            patch("call_use.sdk.rtc.Room", return_value=mock_room),
+            patch("call_use.sdk.api.AccessToken") as MockToken,
+            patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch.dict(
+                os.environ,
+                {
+                    "LIVEKIT_API_KEY": "test-key",
+                    "LIVEKIT_API_SECRET": "test-secret",
+                    "LIVEKIT_URL": "wss://test",
+                },
+            ),
+        ):
+            MockToken.return_value.to_jwt.return_value = "fake-jwt"
+            MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
+            MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+            async def _simulate_malformed_event():
+                await asyncio.sleep(0.01)
+                if data_handler:
+                    dp = MagicMock()
+                    dp.topic = "call-events"
+                    # Malformed event: missing 'type' field
+                    dp.data = json.dumps({"bad_field": "no_type"}).encode()
+                    data_handler(dp)
+
+            asyncio.create_task(_simulate_malformed_event())
+            # Should not crash; falls through to timeout
+            outcome = await agent.call()
+            assert outcome.disposition == DispositionEnum.timeout
 
 
 class TestTokenTTL:

@@ -377,6 +377,125 @@ def test_dial_generic_exception_exits_1(mock_run):
 # ===========================================================================
 
 
+# ===========================================================================
+# doctor command
+# ===========================================================================
+
+
+_ALL_DOCTOR_ENV = {
+    "LIVEKIT_URL": "wss://test",
+    "LIVEKIT_API_KEY": "key",
+    "LIVEKIT_API_SECRET": "secret",
+    "SIP_TRUNK_ID": "trunk",
+    "OPENAI_API_KEY": "sk-test",
+    "DEEPGRAM_API_KEY": "dg-test",
+}
+
+
+class TestDoctor:
+    @patch("call_use.cli._check_livekit_connectivity", return_value=(True, "LiveKit connection OK"))
+    @patch.dict(os.environ, _ALL_DOCTOR_ENV, clear=True)
+    def test_doctor_all_vars_set_shows_success(self, mock_lk):
+        """All env vars set + LiveKit OK → exit 0, all checks pass."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 0
+        assert "7 passed, 0 failed" in result.output
+        assert "LiveKit connection OK" in result.output
+
+    @patch(
+        "call_use.cli._check_livekit_connectivity",
+        return_value=(True, "LiveKit connection OK"),
+    )
+    @patch.dict(
+        os.environ,
+        {k: v for k, v in _ALL_DOCTOR_ENV.items() if k != "DEEPGRAM_API_KEY"},
+        clear=True,
+    )
+    def test_doctor_missing_vars_shows_failure(self, mock_lk):
+        """Missing DEEPGRAM_API_KEY → exit 1, shows failure."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 1
+        assert "DEEPGRAM_API_KEY missing" in result.output
+        assert "1 failed" in result.output
+
+    @patch(
+        "call_use.cli._check_livekit_connectivity",
+        return_value=(
+            False,
+            "LiveKit connection failed: Connection refused",
+        ),
+    )
+    @patch.dict(os.environ, _ALL_DOCTOR_ENV, clear=True)
+    def test_doctor_livekit_connection_failure(self, mock_lk):
+        """LiveKit connection failure → shows error, doesn't crash, exit 1."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 1
+        assert "LiveKit connection failed" in result.output
+        assert "1 failed" in result.output
+
+    @patch.dict(
+        os.environ,
+        {
+            k: v
+            for k, v in _ALL_DOCTOR_ENV.items()
+            if k
+            not in (
+                "LIVEKIT_URL",
+                "LIVEKIT_API_KEY",
+                "LIVEKIT_API_SECRET",
+            )
+        },
+        clear=True,
+    )
+    def test_doctor_livekit_skipped_when_creds_missing(self):
+        """Missing LiveKit credentials → connectivity check skipped, exit 1."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 1
+        assert "LiveKit connectivity skipped" in result.output
+
+
+class TestCheckLivekitConnectivity:
+    def test_success_path(self):
+        """_check_livekit_connectivity returns (True, ...) when probe succeeds."""
+        from call_use.cli import _check_livekit_connectivity
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.__aenter__ = AsyncMock(return_value=mock_lkapi)
+        mock_lkapi.__aexit__ = AsyncMock(return_value=False)
+        mock_lkapi.room.list_rooms = AsyncMock(return_value=[])
+
+        with patch.dict("sys.modules", {"livekit": MagicMock(), "livekit.api": MagicMock()}):
+            with patch("livekit.api.LiveKitAPI", return_value=mock_lkapi):
+                ok, msg = _check_livekit_connectivity()
+        assert ok is True
+        assert "LiveKit connection OK" in msg
+
+    def test_failure_path(self):
+        """_check_livekit_connectivity returns (False, ...) when probe raises."""
+        from call_use.cli import _check_livekit_connectivity
+
+        mock_lkapi = AsyncMock()
+        mock_lkapi.__aenter__ = AsyncMock(return_value=mock_lkapi)
+        mock_lkapi.__aexit__ = AsyncMock(return_value=False)
+        mock_lkapi.room.list_rooms = AsyncMock(side_effect=Exception("Connection refused"))
+
+        with patch.dict("sys.modules", {"livekit": MagicMock(), "livekit.api": MagicMock()}):
+            with patch("livekit.api.LiveKitAPI", return_value=mock_lkapi):
+                ok, msg = _check_livekit_connectivity()
+        assert ok is False
+        assert "LiveKit connection failed" in msg
+        assert "Connection refused" in msg
+
+
+# ===========================================================================
+# _run_call (lines 62-84)
+# ===========================================================================
+
+
 class TestRunCall:
     @patch("call_use.cli.asyncio.run")
     @patch("call_use.cli._check_env")
