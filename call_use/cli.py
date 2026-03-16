@@ -18,7 +18,8 @@ def _check_env():
         "LIVEKIT_API_KEY": "LiveKit API key",
         "LIVEKIT_API_SECRET": "LiveKit API secret",
         "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
-        "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
+        "OPENAI_API_KEY": "OpenAI API key (for LLM reasoning and text-to-speech)",
+        "DEEPGRAM_API_KEY": "Deepgram API key (for speech-to-text)",
     }
     missing = [f"  {k} — {v}" for k, v in required.items() if not os.environ.get(k)]
     if missing:

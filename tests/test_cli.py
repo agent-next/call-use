@@ -221,6 +221,7 @@ def test_check_env_raises_on_missing_vars():
         msg = str(e)
         assert "LIVEKIT_URL" in msg
         assert "OPENAI_API_KEY" in msg
+        assert "DEEPGRAM_API_KEY" in msg
         assert "https://github.com/agent-next/call-use#configure" in msg
 
 
@@ -232,6 +233,7 @@ def test_check_env_raises_on_missing_vars():
         "LIVEKIT_API_SECRET": "secret",
         "SIP_TRUNK_ID": "trunk",
         "OPENAI_API_KEY": "sk-test",
+        "DEEPGRAM_API_KEY": "dg-test",
     },
 )
 def test_check_env_passes_when_all_set():

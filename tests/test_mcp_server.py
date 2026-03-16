@@ -16,6 +16,7 @@ _FULL_ENV = {
     "LIVEKIT_API_SECRET": "secret",
     "SIP_TRUNK_ID": "trunk",
     "OPENAI_API_KEY": "sk-test",
+    "DEEPGRAM_API_KEY": "dg-test",
 }
 
 

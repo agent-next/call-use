@@ -415,6 +415,7 @@ class TestMCPUserExperience:
                     "LIVEKIT_API_SECRET": "s",
                     "SIP_TRUNK_ID": "ST_test",
                     "OPENAI_API_KEY": "sk-test",
+                    "DEEPGRAM_API_KEY": "dg-test",
                 },
             ):
                 result = await _do_dial(phone="+12025551234", instructions="test")
