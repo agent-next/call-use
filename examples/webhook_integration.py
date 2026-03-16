@@ -50,6 +50,7 @@ async def _run_call(call_id: str, req: CallRequest):
         instructions=req.instructions,
         user_info=req.user_info,
         on_event=on_event,
+        approval_required=False,
     )
 
     try:

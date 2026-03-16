@@ -66,6 +66,7 @@ async def call_1_check_balance() -> float | None:
         ),
         user_info=USER_INFO,
         on_event=make_transcript_printer("Bank"),
+        approval_required=False,
     )
 
     outcome = await agent.call()

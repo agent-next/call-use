@@ -35,8 +35,6 @@ async def main():
             print(f"  [{speaker}] {text}")
         elif event.type.value == "state_change":
             print(f"  State: {event.data.get('from')} -> {event.data.get('to')}")
-        elif event.type.value == "action":
-            print(f"  Action: {event.data.get('action')}")
 
     def on_approval(details):
         # Surface the proposed appointment details before committing

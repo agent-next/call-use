@@ -48,8 +48,7 @@ async def main():
         elif event.type.value == "state_change":
             state = event.data.get("to", "")
             print(f"  State -> {state}")
-            if state == "transferred":
-                print("  (transferred — likely to retention department)")
+
 
     def on_approval(details):
         detail_text = details.get("details", "")
