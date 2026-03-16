@@ -451,7 +451,7 @@ def setup():
     click.echo(click.style(f"  \u2713 {provider['name']}", fg="green"))
     click.echo()
 
-    for key_def in provider["keys"]:  # type: ignore[union-attr]
+    for key_def in provider["keys"]:  # type: ignore[union-attr, attr-defined]
         _prompt_key(key_def, values)  # type: ignore[arg-type]
 
     # --- STT key ---

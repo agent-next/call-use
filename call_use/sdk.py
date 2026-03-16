@@ -197,6 +197,7 @@ class CallAgent:
 
                 async def _handle_approval():
                     loop = asyncio.get_running_loop()
+                    assert self._on_approval is not None
                     result = await loop.run_in_executor(None, self._on_approval, event.data)
                     await self._send_approval_response(
                         room_name,

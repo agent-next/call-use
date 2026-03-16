@@ -502,6 +502,47 @@ class TestOnEnter:
         # Give the task time to run
         await asyncio.sleep(0.1)
 
+    async def test_on_enter_data_handler_error_callback_calls_logger(self):
+        """on_enter error callback logs when _on_data_received raises (line 262)."""
+        agent = _make_agent()
+        agent._current_state = CallStateEnum.connected
+        agent._room = MagicMock()
+        agent._lk_api = MagicMock()
+        agent._lk_api.room.update_room_metadata = AsyncMock()
+        agent._room.local_participant.identity = "agent-abc"
+        agent._room.name = "test-room"
+
+        # Make _on_data_received raise so the done-callback error branch fires
+        agent._on_data_received = AsyncMock(side_effect=RuntimeError("boom"))
+
+        registered_handler = None
+
+        def capture_on(event_name, handler):
+            nonlocal registered_handler
+            registered_handler = handler
+
+        agent._room.on = capture_on
+
+        await agent.on_enter()
+        assert registered_handler is not None
+
+        dp = MagicMock()
+
+        with pytest.MonkeyPatch.context() as mp:
+            import call_use.agent as agent_mod
+
+            mock_logger = MagicMock()
+            mp.setattr(agent_mod, "logger", mock_logger)
+
+            registered_handler(dp)
+            # Let the task and done-callback run
+            await asyncio.sleep(0.1)
+
+            mock_logger.error.assert_called_once()
+            args = mock_logger.error.call_args
+            assert args[0][0] == "data handler error"
+            assert isinstance(args[1]["exc_info"], RuntimeError)
+
     async def test_on_enter_no_room_returns_early(self):
         """on_enter returns early if room is None."""
         agent = _make_agent()
