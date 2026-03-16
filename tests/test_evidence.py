@@ -1,6 +1,8 @@
 """Tests for call_use.evidence.EvidencePipeline."""
 
 import json
+import os
+import stat
 
 import pytest
 
@@ -129,6 +131,22 @@ async def test_finalize_writes_json(tmp_path, monkeypatch):
     data = json.loads(log_file.read_text())
     assert data["task_id"] == pipe.task.task_id
     assert data["disposition"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_finalize_log_file_permissions(tmp_path, monkeypatch):
+    """Log files containing PII must be owner-only (0600)."""
+    monkeypatch.setattr("call_use.evidence.LOGS_DIR", tmp_path)
+    pipe = _make_pipeline()
+    await pipe.emit_transcript("agent", "Hi")
+    pipe.finalize(DispositionEnum.completed)
+    log_file = tmp_path / f"{pipe.task.task_id}.json"
+    assert log_file.exists()
+    mode = stat.S_IMODE(os.stat(log_file).st_mode)
+    assert mode == 0o600, f"Expected 0600, got {oct(mode)}"
+    # Directory must also be restricted to owner-only
+    dir_mode = stat.S_IMODE(os.stat(tmp_path).st_mode)
+    assert dir_mode == 0o700, f"Expected dir 0700, got {oct(dir_mode)}"
 
 
 @pytest.mark.asyncio
