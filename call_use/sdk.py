@@ -110,6 +110,20 @@ class CallAgent:
         """
         self._room_name = None
 
+        required_vars = [
+            "LIVEKIT_URL",
+            "LIVEKIT_API_KEY",
+            "LIVEKIT_API_SECRET",
+            "SIP_TRUNK_ID",
+            "OPENAI_API_KEY",
+        ]
+        missing = [v for v in required_vars if v not in os.environ]
+        if missing:
+            raise CallError(
+                CallErrorCode.configuration_error,
+                f"Missing required environment variables: {', '.join(missing)}",
+            )
+
         task = CallTask(
             phone_number=self._phone,
             caller_id=self._caller_id,

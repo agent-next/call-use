@@ -23,6 +23,8 @@ os.environ.setdefault("LIVEKIT_API_SECRET", "test-secret")
 
 from call_use.evidence import EvidencePipeline  # noqa: E402
 from call_use.models import (  # noqa: E402
+    CallError,
+    CallErrorCode,
     CallEvent,
     CallOutcome,
     CallTask,
@@ -147,7 +149,8 @@ class TestSecurityBDD:
         )
 
         mock_room = MagicMock()
-        mock_room.on = lambda event_name: lambda fn: fn
+        _handlers = {}
+        mock_room.on = lambda event_name: lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1]
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -159,12 +162,15 @@ class TestSecurityBDD:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
             patch.dict(
                 os.environ,
                 {
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -173,6 +179,14 @@ class TestSecurityBDD:
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
+            async def _simulate_worker_join():
+                await asyncio.sleep(0.02)
+                if "participant_connected" in _handlers:
+                    p = MagicMock()
+                    p.identity = "call-use-agent-abc123"
+                    _handlers["participant_connected"](p)
+
+            asyncio.create_task(_simulate_worker_join())
             await agent.call()
 
             mock_token_instance.with_ttl.assert_called_once_with(timedelta(hours=2))
@@ -368,6 +382,8 @@ class TestResilienceBDD:
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -381,7 +397,7 @@ class TestResilienceBDD:
     @pytest.mark.asyncio
     async def test_given_no_worker_when_sdk_call_waits_10s_then_timeout_disposition(self):
         """Given no worker joins the room, when SDK call() times out,
-        then outcome has timeout disposition."""
+        then CallError is raised with worker_not_running code."""
         agent = CallAgent(
             phone="+12025551234",
             instructions="Test call",
@@ -402,12 +418,15 @@ class TestResilienceBDD:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
             patch.dict(
                 os.environ,
                 {
                     "LIVEKIT_API_KEY": "test-key",
                     "LIVEKIT_API_SECRET": "test-secret",
                     "LIVEKIT_URL": "wss://test",
+                    "SIP_TRUNK_ID": "test-trunk",
+                    "OPENAI_API_KEY": "test-openai-key",
                 },
             ),
         ):
@@ -415,8 +434,9 @@ class TestResilienceBDD:
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
-            outcome = await agent.call()
-            assert outcome.disposition == DispositionEnum.timeout
+            with pytest.raises(CallError) as exc_info:
+                await agent.call()
+            assert exc_info.value.code == CallErrorCode.worker_not_running
 
     # RR05: Evidence write failure -------------------------------------------
 
