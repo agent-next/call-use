@@ -426,6 +426,17 @@ async def test_dial_invalid_voice_id_falls_back_to_alloy(MockLiveKitAPI, MockDis
 
 @pytest.mark.asyncio
 @patch.dict(os.environ, _FULL_ENV)
+async def test_dial_user_info_not_json_serializable_returns_error():
+    """_do_dial rejects user_info that cannot be serialized to JSON."""
+    result = await _do_dial(
+        phone="+12025551234", instructions="test", user_info={"bad": object()}
+    )
+    assert "error" in result
+    assert "user_info must be JSON-serializable" in result["error"]
+
+
+@pytest.mark.asyncio
+@patch.dict(os.environ, _FULL_ENV)
 async def test_dial_user_info_too_large_returns_error():
     """_do_dial rejects user_info exceeding 10000 chars serialized."""
     big_info = {"data": "x" * 10000}
