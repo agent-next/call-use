@@ -18,6 +18,7 @@ pytestmark = pytest.mark.unit
 async def _selective_timeout(coro, timeout):
     """Only raise TimeoutError for the call timeout (>= 60s), not other wait_for calls."""
     if timeout >= 60:  # call timeout = timeout_seconds + 30, minimum 60
+        await asyncio.sleep(0.1)  # let background tasks run before raising
         raise asyncio.TimeoutError()
     return await asyncio.wait_for(coro, timeout)
 
