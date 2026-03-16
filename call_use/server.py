@@ -359,18 +359,20 @@ def create_app(api_key: str | None = None) -> FastAPI:
     @app.post("/calls/{call_id}/cancel", dependencies=[Depends(verify_api_key_dep)])
     async def cancel_call(call_id: str):
         room_name = _get_room_name(call_id)
-        async with _get_call_lock(call_id), LiveKitAPI() as lkapi:
-            agent_id = await _get_agent_identity(lkapi, room_name)
-            await lkapi.room.send_data(
-                SendDataRequest(
-                    room=room_name,
-                    data=json.dumps({"type": "cancel"}).encode("utf-8"),
-                    kind=DataPacket.Kind.RELIABLE,
-                    topic="backend-commands",
-                    destination_identities=[agent_id],
+        try:
+            async with _get_call_lock(call_id), LiveKitAPI() as lkapi:
+                agent_id = await _get_agent_identity(lkapi, room_name)
+                await lkapi.room.send_data(
+                    SendDataRequest(
+                        room=room_name,
+                        data=json.dumps({"type": "cancel"}).encode("utf-8"),
+                        kind=DataPacket.Kind.RELIABLE,
+                        topic="backend-commands",
+                        destination_identities=[agent_id],
+                    )
                 )
-            )
-        _cleanup_call(call_id)
+        finally:
+            _cleanup_call(call_id)
         return {"status": "cancelling", "call_id": call_id}
 
     return app

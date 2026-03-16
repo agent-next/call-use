@@ -239,7 +239,7 @@ class TestGetCallKnown:
 
 
 # ===========================================================================
-# 6b: GET /calls/{id} ended → cleanup internal state
+# 6b: GET /calls/{id} ended → returns ended idempotently (no cleanup on GET)
 # ===========================================================================
 
 
