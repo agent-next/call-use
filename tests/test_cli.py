@@ -788,6 +788,10 @@ class TestSetup:
             assert "OPENAI_API_KEY=sk-testabc" in env_content
             assert "DEEPGRAM_API_KEY=dg-testabc" in env_content
 
+            # .env should have restricted permissions (secrets inside)
+            mode = os.stat(".env").st_mode & 0o777
+            assert mode == 0o600, f".env permissions should be 0o600, got {oct(mode)}"
+
     @patch("call_use.cli.load_dotenv", create=True)
     @patch.dict(os.environ, {}, clear=True)
     def test_setup_openrouter_provider(self, mock_dotenv, tmp_path):

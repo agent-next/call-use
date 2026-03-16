@@ -474,6 +474,7 @@ def setup():
         safe_v = v.replace("\r", "").replace("\n", "")
         lines.append(f"{k}={safe_v}")
     env_path.write_text("\n".join(lines) + "\n")
+    env_path.chmod(0o600)
     click.echo(click.style(f"  \u2713 Created .env with {len(values)} variables", fg="green"))
     click.echo()
 
