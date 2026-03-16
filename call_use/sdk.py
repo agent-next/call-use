@@ -66,6 +66,24 @@ class CallAgent:
         on_approval: Callable[[dict], str] | None = None,
         recording_disclaimer: str | None = None,
     ):
+        """Initialize a CallAgent for making an outbound call.
+
+        Args:
+            phone: Target phone number in E.164 format.
+            instructions: Natural-language instructions for the agent.
+            user_info: Optional context dict passed to the agent.
+            caller_id: Optional outbound caller ID in E.164 format.
+            voice_id: Optional voice identifier for TTS.
+            approval_required: Whether the agent must request approval before acting.
+            timeout_seconds: Maximum call duration in seconds.
+            on_event: Optional callback invoked for every call event.
+            on_approval: Callback invoked when the agent requests approval.
+            recording_disclaimer: Optional disclaimer played at the start of the call.
+
+        Raises:
+            ValueError: If phone number is invalid or if approval_required=True
+                without an on_approval callback.
+        """
         if approval_required and on_approval is None:
             raise ValueError(
                 "on_approval callback is required when approval_required=True. "
@@ -84,7 +102,12 @@ class CallAgent:
         self._room_name: str | None = None
 
     async def call(self) -> CallOutcome:
-        """Execute the call and return the outcome."""
+        """Execute the call and return the outcome.
+
+        Raises:
+            RuntimeError: If required environment variables (LIVEKIT_API_KEY,
+                LIVEKIT_API_SECRET, LIVEKIT_URL) are missing.
+        """
         self._room_name = None
 
         task = CallTask(
