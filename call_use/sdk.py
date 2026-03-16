@@ -197,9 +197,7 @@ class CallAgent:
             # Wait for worker to pick up the job
             if not worker_joined.is_set():
                 try:
-                    await asyncio.wait_for(
-                        worker_joined.wait(), timeout=WORKER_JOIN_TIMEOUT
-                    )
+                    await asyncio.wait_for(worker_joined.wait(), timeout=WORKER_JOIN_TIMEOUT)
                 except asyncio.TimeoutError:
                     raise CallError(
                         code=CallErrorCode.worker_not_running,

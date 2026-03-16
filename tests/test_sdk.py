@@ -941,7 +941,8 @@ class TestTokenTTL:
         )
 
         mock_room = MagicMock()
-        mock_room.on = lambda event_name: lambda fn: fn
+        _handlers = {}
+        mock_room.on = lambda event_name: lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1]
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -953,6 +954,7 @@ class TestTokenTTL:
             patch("call_use.sdk.rtc.Room", return_value=mock_room),
             patch("call_use.sdk.api.AccessToken") as MockToken,
             patch("call_use.sdk.LiveKitAPI") as MockLKAPI,
+            patch("call_use.sdk.WORKER_JOIN_TIMEOUT", 0.1),
             patch.dict(
                 os.environ,
                 {
@@ -967,6 +969,14 @@ class TestTokenTTL:
             MockLKAPI.return_value.__aenter__ = AsyncMock(return_value=mock_lkapi)
             MockLKAPI.return_value.__aexit__ = AsyncMock(return_value=False)
 
+            async def _simulate_worker_join():
+                await asyncio.sleep(0.02)
+                if "participant_connected" in _handlers:
+                    p = MagicMock()
+                    p.identity = "call-use-agent-abc123"
+                    _handlers["participant_connected"](p)
+
+            asyncio.create_task(_simulate_worker_join())
             await agent.call()
 
             mock_token_instance.with_ttl.assert_called_once_with(timedelta(hours=2))
