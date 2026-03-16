@@ -16,6 +16,10 @@ from call_use.phone import validate_caller_id, validate_phone_number
 from call_use.rate_limit import RateLimiter
 
 
+class InjectRequest(BaseModel):
+    message: str = Field(..., min_length=1, max_length=2000)
+
+
 class CreateCallRequest(BaseModel):
     phone_number: str
     instructions: str = Field(default="Have a friendly conversation", max_length=5000)
@@ -186,17 +190,16 @@ def create_app(api_key: str | None = None) -> FastAPI:
         )
 
     @app.post("/calls/{call_id}/inject", dependencies=[Depends(verify_api_key_dep)])
-    async def inject_message(call_id: str, body: dict):
-        message = body.get("message")
-        if not message:
-            raise HTTPException(400, "message is required")
+    async def inject_message(call_id: str, body: InjectRequest):
         room_name = _get_room_name(call_id)
         async with _get_call_lock(call_id), LiveKitAPI() as lkapi:
             agent_id = await _get_agent_identity(lkapi, room_name)
             await lkapi.room.send_data(
                 SendDataRequest(
                     room=room_name,
-                    data=json.dumps({"type": "inject_context", "text": message}).encode("utf-8"),
+                    data=json.dumps({"type": "inject_context", "text": body.message}).encode(
+                        "utf-8"
+                    ),
                     kind=DataPacket.Kind.RELIABLE,
                     topic="backend-commands",
                     destination_identities=[agent_id],
