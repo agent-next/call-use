@@ -316,7 +316,7 @@ class TestCallAgentCallMethod:
 
         mock_room = MagicMock()
         _handlers = {}
-        mock_room.on = lambda event_name: (lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1])
+        mock_room.on = lambda event_name: lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1]
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -608,7 +608,7 @@ class TestCallAgentCallMethod:
 
         mock_room = MagicMock()
         _handlers = {}
-        mock_room.on = lambda event_name: (lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1])
+        mock_room.on = lambda event_name: lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1]
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 
@@ -671,7 +671,7 @@ class TestCallAgentCallMethod:
 
         mock_room = MagicMock()
         _handlers = {}
-        mock_room.on = lambda event_name: (lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1])
+        mock_room.on = lambda event_name: lambda fn: (_handlers.__setitem__(event_name, fn), fn)[1]
         mock_room.connect = AsyncMock()
         mock_room.disconnect = AsyncMock()
 

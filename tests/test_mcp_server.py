@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from call_use.models import CallError, CallErrorCode
 from call_use.mcp_server import _do_dial, _do_result, _do_status
+from call_use.models import CallError, CallErrorCode
 
 pytestmark = pytest.mark.unit
 
