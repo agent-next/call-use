@@ -35,6 +35,57 @@ call-use dial PHONE [OPTIONS]
 | `--timeout` | | `int` | `600` | Max call duration in seconds |
 | `--approval-required` | | flag | `False` | Require interactive approval for sensitive actions |
 
+### `call-use doctor`
+
+Check that all required environment variables are set and that LiveKit is reachable. This is the fastest way to verify your setup before making a call.
+
+```bash
+call-use doctor
+```
+
+The command checks six environment variables (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, `SIP_TRUNK_ID`, `OPENAI_API_KEY`, `DEEPGRAM_API_KEY`) and then attempts to connect to your LiveKit server.
+
+**Example output (all configured):**
+
+```
+  ✓ LIVEKIT_URL set
+  ✓ LIVEKIT_API_KEY set
+  ✓ LIVEKIT_API_SECRET set
+  ✓ SIP_TRUNK_ID set
+  ✓ OPENAI_API_KEY set
+  ✓ DEEPGRAM_API_KEY set
+  ✓ LiveKit connection OK
+
+  7 passed, 0 failed
+```
+
+**Example output (partial configuration):**
+
+```
+  ✓ LIVEKIT_URL set
+  ✓ LIVEKIT_API_KEY set
+  ✓ LIVEKIT_API_SECRET set
+  ✗ SIP_TRUNK_ID missing
+  ✗ OPENAI_API_KEY missing
+  ✓ DEEPGRAM_API_KEY set
+  ✗ LiveKit connection failed: ...
+
+  3 passed, 4 failed
+```
+
+**When to use it:**
+
+- After first-time setup, to confirm every credential is in place.
+- When a call fails unexpectedly, to rule out configuration issues.
+- In CI, as a smoke test before running integration tests.
+
+**Exit codes:**
+
+| Code | Meaning |
+|------|---------|
+| `0` | All checks passed |
+| `1` | One or more checks failed |
+
 ### `call-use --version`
 
 Print the installed version.

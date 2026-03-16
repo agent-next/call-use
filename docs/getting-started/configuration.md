@@ -73,19 +73,28 @@ OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ## Verifying your configuration
 
-The CLI checks for required environment variables before making a call. Run a quick check:
+!!! tip "Verify your setup"
+    Run `call-use doctor` to check all variables are set and LiveKit is reachable. See the [CLI guide](../guides/cli.md#call-use-doctor) for full details.
 
 ```bash
-call-use dial "+18001234567" -i "Test" 2>&1 | head -5
+call-use doctor
 ```
 
-If any variables are missing, you will see a clear error message listing what is needed:
+If everything is configured correctly you will see all green checks:
 
 ```
-Missing required environment variables:
-  LIVEKIT_URL — LiveKit server URL (wss://...)
-  SIP_TRUNK_ID — Twilio SIP trunk ID in LiveKit
+  ✓ LIVEKIT_URL set
+  ✓ LIVEKIT_API_KEY set
+  ✓ LIVEKIT_API_SECRET set
+  ✓ SIP_TRUNK_ID set
+  ✓ OPENAI_API_KEY set
+  ✓ DEEPGRAM_API_KEY set
+  ✓ LiveKit connection OK
+
+  7 passed, 0 failed
 ```
+
+If any variables are missing, doctor will flag them with ✗ and exit with code 1.
 
 ## Starting the worker
 
