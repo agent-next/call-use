@@ -166,8 +166,9 @@ async def test_do_dial_livekit_connection_error(MockLiveKitAPI):
 
 
 @pytest.mark.asyncio
+@patch("call_use.mcp_server.SendDataRequest")
 @patch("call_use.mcp_server.LiveKitAPI")
-async def test_cancel_sends_command(MockLiveKitAPI):
+async def test_cancel_sends_command(MockLiveKitAPI, MockSendDataReq):
     """cancel tool sends cancel command targeted to agent, not broadcast."""
     mock_api = AsyncMock()
     MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
@@ -185,10 +186,11 @@ async def test_cancel_sends_command(MockLiveKitAPI):
     assert result["status"] == "cancel_requested"
     mock_api.room.send_data.assert_called_once()
 
-    # Verify the cancel targets only the agent
-    call_args = mock_api.room.send_data.call_args
-    send_req = call_args[0][0]
-    assert send_req.destination_identities == ["agent-abc123"]
+    # Verify the cancel targets only the agent via SendDataRequest kwargs
+    send_kwargs = MockSendDataReq.call_args.kwargs
+    assert send_kwargs["destination_identities"] == ["agent-abc123"]
+    assert send_kwargs["topic"] == "backend-commands"
+    assert send_kwargs["room"] == "call-test-cancel"
 
 
 @pytest.mark.asyncio
@@ -524,6 +526,40 @@ async def test_dial_generic_call_error(mock_do_dial):
 # ===========================================================================
 # SDK worker identity prefix check
 # ===========================================================================
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_get_agent_identity_room_not_found(MockLiveKitAPI):
+    """_get_agent_identity raises ValueError when room does not exist."""
+    mock_api = AsyncMock()
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[]))
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import cancel
+
+    result_str = await cancel(task_id="call-nonexistent")
+    result = json.loads(result_str)
+    assert "error" in result
+
+
+@pytest.mark.asyncio
+@patch("call_use.mcp_server.LiveKitAPI")
+async def test_get_agent_identity_agent_not_initialized(MockLiveKitAPI):
+    """_get_agent_identity raises ValueError when agent_identity not in metadata."""
+    mock_api = AsyncMock()
+    mock_room = MagicMock()
+    mock_room.metadata = json.dumps({"state": "connecting"})
+    mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+    MockLiveKitAPI.return_value.__aenter__ = AsyncMock(return_value=mock_api)
+    MockLiveKitAPI.return_value.__aexit__ = AsyncMock(return_value=False)
+
+    from call_use.mcp_server import cancel
+
+    result_str = await cancel(task_id="call-no-agent")
+    result = json.loads(result_str)
+    assert "error" in result
 
 
 def test_non_agent_participant_does_not_trigger_worker_joined():

@@ -119,7 +119,11 @@ class TestMCPCompleteWorkflowBDD:
         dial_result = await _do_dial(phone="+18005551234", instructions="Test cancel")
         task_id = dial_result["task_id"]
 
-        # -- When: cancel the call --
+        # -- When: cancel the call (agent_identity must be in room metadata) --
+        mock_room = MagicMock()
+        mock_room.metadata = json.dumps({"agent_identity": "agent-cancel-test"})
+        mock_api.room.list_rooms = AsyncMock(return_value=MagicMock(rooms=[mock_room]))
+
         cancel_json = await cancel(task_id=task_id)
         cancel_result = json.loads(cancel_json)
 
