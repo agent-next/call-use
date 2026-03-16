@@ -43,17 +43,18 @@ async def _do_dial(
     timeout: int = 600,
 ) -> dict:
     """Dispatch a call via LiveKit and return immediately with task_id."""
-    required = {
-        "LIVEKIT_URL": "LiveKit server URL (wss://...)",
-        "LIVEKIT_API_KEY": "LiveKit API key",
-        "LIVEKIT_API_SECRET": "LiveKit API secret",
-        "SIP_TRUNK_ID": "Twilio SIP trunk ID in LiveKit",
-        "OPENAI_API_KEY": "OpenAI API key (for STT + LLM + TTS)",
-    }
-    missing = [f"{k} — {v}" for k, v in required.items() if not os.environ.get(k)]
+    required = [
+        "LIVEKIT_URL",
+        "LIVEKIT_API_KEY",
+        "LIVEKIT_API_SECRET",
+        "SIP_TRUNK_ID",
+        "OPENAI_API_KEY",
+    ]
+    missing = [k for k in required if not os.environ.get(k)]
     if missing:
+        logger.error("Missing required env vars: %s", missing)
         return {
-            "error": "Missing required environment variables",
+            "error": "Server configuration incomplete. Required environment variables are not set.",
             "missing": missing,
             "help": "https://github.com/agent-next/call-use#configure",
         }
@@ -181,8 +182,9 @@ async def dial(
             timeout=timeout,
         )
         return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e)})
+    except Exception:
+        logger.error("dial tool error", exc_info=True)
+        return json.dumps({"error": "Internal error. Check server logs for details."})
 
 
 @mcp.tool()
@@ -195,8 +197,10 @@ async def status(task_id: str) -> str:
     try:
         result = await _do_status(task_id)
         return json.dumps(result, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+    except Exception:
+        logger.error("status tool error", exc_info=True)
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 @mcp.tool()
@@ -217,8 +221,10 @@ async def cancel(task_id: str) -> str:
                 )
             )
         return json.dumps({"task_id": task_id, "status": "cancel_requested"})
-    except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+    except Exception:
+        logger.error("cancel tool error", exc_info=True)
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 @mcp.tool()
@@ -233,8 +239,10 @@ async def result(task_id: str) -> str:
     try:
         outcome = await _do_result(task_id)
         return json.dumps(outcome, indent=2)
-    except Exception as e:
-        return json.dumps({"error": str(e), "task_id": task_id})
+    except Exception:
+        logger.error("result tool error", exc_info=True)
+        err = {"error": "Internal error. Check server logs for details.", "task_id": task_id}
+        return json.dumps(err)
 
 
 def main():
