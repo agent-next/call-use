@@ -52,7 +52,7 @@ class TestLazyImports:
 
 def _extract_json(output: str) -> dict:
     """Extract JSON object from CLI output (ignoring stderr lines mixed in)."""
-    # Find the JSON block in the output — it starts with '{'
+    # Find the JSON block in the output -- it starts with '{'
     lines = output.strip().split("\n")
     json_lines = []
     in_json = False
@@ -212,7 +212,7 @@ def test_dial_connection_error_shows_livekit_message(mock_run):
 
 @patch.dict(os.environ, {}, clear=True)
 def test_check_env_raises_on_missing_vars():
-    """_check_env raises RuntimeError listing all missing vars."""
+    """_check_env raises RuntimeError listing all missing vars (default openai provider)."""
     from call_use.cli import _check_env
 
     try:
@@ -235,10 +235,129 @@ def test_check_env_raises_on_missing_vars():
         "SIP_TRUNK_ID": "trunk",
         "OPENAI_API_KEY": "sk-test",
         "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "openai",
     },
 )
 def test_check_env_passes_when_all_set():
     """_check_env does not raise when all vars are set."""
+    from call_use.cli import _check_env
+
+    _check_env()  # Should not raise
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "GOOGLE_API_KEY": "goog-test",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "google",
+    },
+)
+def test_check_env_passes_for_google_provider():
+    """_check_env does not raise for google provider with correct keys."""
+    from call_use.cli import _check_env
+
+    _check_env()  # Should not raise
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "grok",
+    },
+)
+def test_check_env_raises_for_grok_missing_keys():
+    """_check_env raises for grok provider missing XAI_API_KEY."""
+    from call_use.cli import _check_env
+
+    with pytest.raises(RuntimeError, match="XAI_API_KEY"):
+        _check_env()
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "XAI_API_KEY": "xai-test",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "grok",
+    },
+)
+def test_check_env_raises_for_grok_missing_openai_tts_key():
+    """_check_env raises for grok when OPENAI_API_KEY (TTS) is missing."""
+    from call_use.cli import _check_env
+
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        _check_env()
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "XAI_API_KEY": "xai-test",
+        "OPENAI_API_KEY": "sk-test",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "grok",
+    },
+)
+def test_check_env_passes_for_grok_all_keys():
+    """_check_env passes for grok with both XAI and OPENAI keys."""
+    from call_use.cli import _check_env
+
+    _check_env()  # Should not raise
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "OPENROUTER_API_KEY": "or-test",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "openrouter",
+    },
+)
+def test_check_env_raises_for_openrouter_missing_openai_tts_key():
+    """_check_env raises for openrouter when OPENAI_API_KEY (TTS) is missing."""
+    from call_use.cli import _check_env
+
+    with pytest.raises(RuntimeError, match="OPENAI_API_KEY"):
+        _check_env()
+
+
+@patch.dict(
+    os.environ,
+    {
+        "LIVEKIT_URL": "wss://test",
+        "LIVEKIT_API_KEY": "key",
+        "LIVEKIT_API_SECRET": "secret",
+        "SIP_TRUNK_ID": "trunk",
+        "OPENROUTER_API_KEY": "or-test",
+        "OPENAI_API_KEY": "sk-test",
+        "DEEPGRAM_API_KEY": "dg-test",
+        "CALL_USE_LLM_PROVIDER": "openrouter",
+    },
+)
+def test_check_env_passes_for_openrouter_all_keys():
+    """_check_env passes for openrouter with both keys."""
     from call_use.cli import _check_env
 
     _check_env()  # Should not raise
@@ -390,6 +509,7 @@ _ALL_DOCTOR_ENV = {
     "SIP_TRUNK_ID": "trunk",
     "OPENAI_API_KEY": "sk-test",
     "DEEPGRAM_API_KEY": "dg-test",
+    "CALL_USE_LLM_PROVIDER": "openai",
 }
 
 
@@ -397,7 +517,7 @@ class TestDoctor:
     @patch("call_use.cli._check_livekit_connectivity", return_value=(True, "LiveKit connection OK"))
     @patch.dict(os.environ, _ALL_DOCTOR_ENV, clear=True)
     def test_doctor_all_vars_set_shows_success(self, mock_lk):
-        """All env vars set + LiveKit OK → exit 0, all checks pass."""
+        """All env vars set + LiveKit OK -> exit 0, all checks pass."""
         runner = CliRunner()
         result = runner.invoke(main, ["doctor"])
         assert result.exit_code == 0
@@ -414,7 +534,7 @@ class TestDoctor:
         clear=True,
     )
     def test_doctor_missing_vars_shows_failure(self, mock_lk):
-        """Missing DEEPGRAM_API_KEY → exit 1, shows failure."""
+        """Missing DEEPGRAM_API_KEY -> exit 1, shows failure."""
         runner = CliRunner()
         result = runner.invoke(main, ["doctor"])
         assert result.exit_code == 1
@@ -430,12 +550,34 @@ class TestDoctor:
     )
     @patch.dict(os.environ, _ALL_DOCTOR_ENV, clear=True)
     def test_doctor_livekit_connection_failure(self, mock_lk):
-        """LiveKit connection failure → shows error, doesn't crash, exit 1."""
+        """LiveKit connection failure -> shows error, doesn't crash, exit 1."""
         runner = CliRunner()
         result = runner.invoke(main, ["doctor"])
         assert result.exit_code == 1
         assert "LiveKit connection failed" in result.output
         assert "1 failed" in result.output
+
+    @patch("call_use.cli._check_livekit_connectivity", return_value=(True, "LiveKit connection OK"))
+    @patch.dict(
+        os.environ,
+        {
+            "LIVEKIT_URL": "wss://test",
+            "LIVEKIT_API_KEY": "key",
+            "LIVEKIT_API_SECRET": "secret",
+            "SIP_TRUNK_ID": "trunk",
+            "GOOGLE_API_KEY": "goog-test",
+            "DEEPGRAM_API_KEY": "dg-test",
+            "CALL_USE_LLM_PROVIDER": "google",
+        },
+        clear=True,
+    )
+    def test_doctor_google_provider_checks_google_key(self, mock_lk):
+        """Doctor with google provider checks GOOGLE_API_KEY, not OPENAI."""
+        runner = CliRunner()
+        result = runner.invoke(main, ["doctor"])
+        assert result.exit_code == 0
+        assert "GOOGLE_API_KEY set" in result.output
+        assert "OPENAI_API_KEY" not in result.output
 
     @patch.dict(
         os.environ,
@@ -452,7 +594,7 @@ class TestDoctor:
         clear=True,
     )
     def test_doctor_livekit_skipped_when_creds_missing(self):
-        """Missing LiveKit credentials → connectivity check skipped, exit 1."""
+        """Missing LiveKit credentials -> connectivity check skipped, exit 1."""
         runner = CliRunner()
         result = runner.invoke(main, ["doctor"])
         assert result.exit_code == 1
@@ -553,7 +695,7 @@ class TestRunCall:
 
 
 # ===========================================================================
-# Worker not running — CallError handling
+# Worker not running -- CallError handling
 # ===========================================================================
 
 
@@ -592,3 +734,372 @@ def test_dial_other_call_error_shows_generic_message(mock_run):
     result = runner.invoke(main, ["dial", "+18005551234", "-i", "test"])
     assert result.exit_code == 1
     assert "SIP trunk not responding" in result.output
+
+
+# ===========================================================================
+# setup command
+# ===========================================================================
+
+
+class TestSetup:
+    """Tests for the interactive setup wizard."""
+
+    def _make_required_input(
+        self,
+        livekit_url="wss://my-app.livekit.cloud",
+        livekit_key="APIxxx",
+        livekit_secret="secretval",
+        sip_trunk="ST_xxxx",
+        provider_choice="1",
+        openai_key="sk-testabc",
+        deepgram_key="dg-testabc",
+        api_key="",
+    ):
+        """Build stdin input for the setup wizard (OpenAI default)."""
+        lines = [
+            livekit_url,
+            livekit_key,
+            livekit_secret,
+            sip_trunk,
+            provider_choice,  # LLM provider selection
+            openai_key,  # provider-specific key(s)
+            deepgram_key,
+            api_key,  # optional API_KEY (empty = skip)
+        ]
+        return "\n".join(lines) + "\n"
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_writes_env_file(self, mock_dotenv, tmp_path):
+        """Setup writes .env with all required keys (default OpenAI provider)."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(main, ["setup"], input=self._make_required_input())
+            assert result.exit_code == 0
+            assert "Created .env with 7 variables" in result.output
+
+            env_content = open(".env").read()
+            assert "# Generated by call-use setup" in env_content
+            assert "LIVEKIT_URL=wss://my-app.livekit.cloud" in env_content
+            assert "LIVEKIT_API_KEY=APIxxx" in env_content
+            assert "LIVEKIT_API_SECRET=secretval" in env_content
+            assert "SIP_TRUNK_ID=ST_xxxx" in env_content
+            assert "CALL_USE_LLM_PROVIDER=openai" in env_content
+            assert "OPENAI_API_KEY=sk-testabc" in env_content
+            assert "DEEPGRAM_API_KEY=dg-testabc" in env_content
+
+            # .env should have restricted permissions (secrets inside)
+            mode = os.stat(".env").st_mode & 0o777
+            assert mode == 0o600, f".env permissions should be 0o600, got {oct(mode)}"
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_openrouter_provider(self, mock_dotenv, tmp_path):
+        """Setup with OpenRouter provider asks for OPENROUTER + OPENAI keys."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            lines = [
+                "wss://app.livekit.cloud",
+                "APIxxx",
+                "secretval",
+                "ST_xxxx",
+                "2",  # OpenRouter
+                "or-key-123",  # OPENROUTER_API_KEY
+                "sk-ttskey",  # OPENAI_API_KEY for TTS
+                "dg-testabc",
+                "",  # skip optional
+            ]
+            result = runner.invoke(main, ["setup"], input="\n".join(lines) + "\n")
+            assert result.exit_code == 0
+
+            env_content = open(".env").read()
+            assert "CALL_USE_LLM_PROVIDER=openrouter" in env_content
+            assert "OPENROUTER_API_KEY=or-key-123" in env_content
+            assert "OPENAI_API_KEY=sk-ttskey" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_google_provider(self, mock_dotenv, tmp_path):
+        """Setup with Google Gemini provider asks for GOOGLE_API_KEY."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            lines = [
+                "wss://app.livekit.cloud",
+                "APIxxx",
+                "secretval",
+                "ST_xxxx",
+                "3",  # Google Gemini
+                "AIza-google-key",  # GOOGLE_API_KEY
+                "dg-testabc",
+                "",  # skip optional
+            ]
+            result = runner.invoke(main, ["setup"], input="\n".join(lines) + "\n")
+            assert result.exit_code == 0
+
+            env_content = open(".env").read()
+            assert "CALL_USE_LLM_PROVIDER=google" in env_content
+            assert "GOOGLE_API_KEY=AIza-google-key" in env_content
+            assert "OPENAI_API_KEY" not in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_grok_provider(self, mock_dotenv, tmp_path):
+        """Setup with Grok provider asks for XAI_API_KEY + OPENAI_API_KEY."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            lines = [
+                "wss://app.livekit.cloud",
+                "APIxxx",
+                "secretval",
+                "ST_xxxx",
+                "4",  # Grok
+                "xai-key-123",  # XAI_API_KEY
+                "sk-ttskey",  # OPENAI_API_KEY for TTS
+                "dg-testabc",
+                "",  # skip optional
+            ]
+            result = runner.invoke(main, ["setup"], input="\n".join(lines) + "\n")
+            assert result.exit_code == 0
+
+            env_content = open(".env").read()
+            assert "CALL_USE_LLM_PROVIDER=grok" in env_content
+            assert "XAI_API_KEY=xai-key-123" in env_content
+            assert "OPENAI_API_KEY=sk-ttskey" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_with_optional_key(self, mock_dotenv, tmp_path):
+        """Setup includes optional API_KEY when provided."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main,
+                ["setup"],
+                input=self._make_required_input(api_key="my-api-key"),
+            )
+            assert result.exit_code == 0
+            assert "Created .env with 8 variables" in result.output
+            env_content = open(".env").read()
+            assert "API_KEY=my-api-key" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_optional_key_skipped(self, mock_dotenv, tmp_path):
+        """Optional keys show skip message when Enter is pressed."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(main, ["setup"], input=self._make_required_input())
+            assert result.exit_code == 0
+            assert "API_KEY skipped" in result.output
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_existing_env_overwrite_yes(self, mock_dotenv, tmp_path):
+        """Existing .env with overwrite=y proceeds normally."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            open(".env", "w").write("OLD=value\n")
+            # 'y' for overwrite + normal required + optional input
+            inp = "y\n" + self._make_required_input()
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            assert "Created .env with 7 variables" in result.output
+            env_content = open(".env").read()
+            assert "OLD=value" not in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_existing_env_overwrite_no(self, mock_dotenv, tmp_path):
+        """Existing .env with overwrite=n aborts."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            open(".env", "w").write("OLD=value\n")
+            result = runner.invoke(main, ["setup"], input="n\n")
+            assert result.exit_code == 0
+            assert "Aborted" in result.output
+            # Original file untouched
+            assert open(".env").read() == "OLD=value\n"
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_livekit_url_validation(self, mock_dotenv, tmp_path):
+        """LIVEKIT_URL must start with wss:// or ws://."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            # First enter invalid, then valid
+            inp = "http://bad.url\nwss://good.livekit.cloud\n"
+            inp += "APIxxx\nsecretval\nST_xxxx\n"
+            inp += "1\nsk-testabc\ndg-testabc\n\n"
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            assert "Must start with wss:// or ws://" in result.output
+            env_content = open(".env").read()
+            assert "LIVEKIT_URL=wss://good.livekit.cloud" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_openai_key_validation(self, mock_dotenv, tmp_path):
+        """OPENAI_API_KEY must start with sk-."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            inp = "wss://app.livekit.cloud\nAPIxxx\nsecretval\nST_xxxx\n"
+            inp += "1\nbad-key\nsk-goodkey\n"  # provider 1, first invalid, then valid
+            inp += "dg-testabc\n\n"
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            assert "Must start with sk-" in result.output
+            env_content = open(".env").read()
+            assert "OPENAI_API_KEY=sk-goodkey" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {"LIVEKIT_URL": "wss://existing.value"}, clear=True)
+    def test_setup_shows_existing_env_as_default(self, mock_dotenv, tmp_path):
+        """Existing env vars appear as defaults in prompts."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            # Press enter to accept existing LIVEKIT_URL default, provide rest
+            inp = "\nAPIxxx\nsecretval\nST_xxxx\n1\nsk-testabc\ndg-testabc\n\n"
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            env_content = open(".env").read()
+            assert "LIVEKIT_URL=wss://existing.value" in env_content
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_runs_doctor_verification(self, mock_dotenv, tmp_path):
+        """Setup runs verification after writing .env."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(main, ["setup"], input=self._make_required_input())
+            assert result.exit_code == 0
+            assert "Running call-use doctor..." in result.output
+            assert "Setup complete!" in result.output
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_empty_required_key_retries(self, mock_dotenv, tmp_path):
+        """Empty required key shows error and re-prompts."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            # Empty LIVEKIT_URL first, then valid
+            inp = "\nwss://ok.livekit.cloud\nAPIxxx\nsecretval\nST_xxxx\n"
+            inp += "1\nsk-testabc\ndg-testabc\n\n"
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            assert "LIVEKIT_URL is required" in result.output
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_invalid_provider_choice_retries(self, mock_dotenv, tmp_path):
+        """Invalid provider choice shows error and re-prompts."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            inp = "wss://app.livekit.cloud\nAPIxxx\nsecretval\nST_xxxx\n"
+            inp += "9\n1\nsk-testabc\ndg-testabc\n\n"  # invalid then valid
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            assert "Invalid choice" in result.output
+
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_google_provider_verification_checks_google_key(self, tmp_path):
+        """Setup verification shows GOOGLE_API_KEY for google provider."""
+
+        def _fake_load_dotenv(*args, **kwargs):
+            """Simulate load_dotenv by reading .env and setting os.environ."""
+            from pathlib import Path
+
+            env_file = Path(".env")
+            if env_file.exists():
+                for line in env_file.read_text().splitlines():
+                    if "=" in line and not line.startswith("#"):
+                        k, v = line.split("=", 1)
+                        if kwargs.get("override") or k not in os.environ:
+                            os.environ[k] = v
+
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            lines = [
+                "wss://app.livekit.cloud",
+                "APIxxx",
+                "secretval",
+                "ST_xxxx",
+                "3",
+                "AIza-google-key",
+                "dg-testabc",
+                "",
+            ]
+            with patch("dotenv.load_dotenv", side_effect=_fake_load_dotenv):
+                result = runner.invoke(main, ["setup"], input="\n".join(lines) + "\n")
+            assert result.exit_code == 0
+            assert "GOOGLE_API_KEY set" in result.output
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {}, clear=True)
+    def test_setup_sanitizes_newlines_in_env_values(self, mock_dotenv, tmp_path):
+        """Values with embedded carriage returns are sanitized in .env."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            result = runner.invoke(
+                main,
+                ["setup"],
+                input=self._make_required_input(),
+            )
+            assert result.exit_code == 0
+            env_content = open(".env").read()
+            for line in env_content.strip().split("\n"):
+                assert "=" in line or line.startswith("#"), f"Malformed line: {line}"
+
+    @patch("call_use.cli.load_dotenv", create=True)
+    @patch.dict(os.environ, {"API_KEY": "existing-api-key"}, clear=True)
+    def test_setup_optional_key_shows_existing_default(self, mock_dotenv, tmp_path):
+        """Optional key shows existing env value as default."""
+        runner = CliRunner()
+        with runner.isolated_filesystem(temp_dir=tmp_path):
+            inp = "wss://app.livekit.cloud\nAPIxxx\nsecretval\nST_xxxx\n"
+            inp += "1\nsk-testabc\ndg-testabc\n\n"  # accept default optional
+            result = runner.invoke(main, ["setup"], input=inp)
+            assert result.exit_code == 0
+            env_content = open(".env").read()
+            assert "API_KEY=existing-api-key" in env_content
+
+
+# ===========================================================================
+# _get_env_vars_for_provider
+# ===========================================================================
+
+
+class TestGetEnvVarsForProvider:
+    def test_openai_provider(self):
+        from call_use.cli import _get_env_vars_for_provider
+
+        result = _get_env_vars_for_provider("openai")
+        assert "OPENAI_API_KEY" in result
+        assert "LIVEKIT_URL" in result
+        assert "DEEPGRAM_API_KEY" in result
+
+    def test_google_provider(self):
+        from call_use.cli import _get_env_vars_for_provider
+
+        result = _get_env_vars_for_provider("google")
+        assert "GOOGLE_API_KEY" in result
+        assert "OPENAI_API_KEY" not in result
+
+    def test_grok_provider(self):
+        from call_use.cli import _get_env_vars_for_provider
+
+        result = _get_env_vars_for_provider("grok")
+        assert "XAI_API_KEY" in result
+        assert "OPENAI_API_KEY" in result
+
+    def test_openrouter_provider(self):
+        from call_use.cli import _get_env_vars_for_provider
+
+        result = _get_env_vars_for_provider("openrouter")
+        assert "OPENROUTER_API_KEY" in result
+        assert "OPENAI_API_KEY" in result
+
+    def test_unknown_provider_falls_back_to_openai(self):
+        from call_use.cli import _get_env_vars_for_provider
+
+        result = _get_env_vars_for_provider("unknown")
+        assert "OPENAI_API_KEY" in result
