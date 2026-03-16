@@ -27,7 +27,7 @@ class CallTask(BaseModel):
     user_info: dict = Field(default_factory=dict)
     voice_id: str | None = None
     approval_required: bool = True
-    timeout_seconds: int = 600
+    timeout_seconds: int = Field(default=600, ge=30, le=3600)
     recording_disclaimer: str | None = None
 
 

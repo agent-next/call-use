@@ -145,7 +145,7 @@ class TestSecurityBDD:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -365,7 +365,7 @@ class TestResilienceBDD:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -402,7 +402,7 @@ class TestResilienceBDD:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,  # Immediate timeout
+            timeout_seconds=30,  # Immediate timeout
         )
 
         mock_room = MagicMock()

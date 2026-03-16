@@ -200,3 +200,41 @@ class TestCallError:
 
     def test_is_exception(self):
         assert issubclass(CallError, Exception)
+
+
+# ---------------------------------------------------------------------------
+# CallTask timeout validation
+# ---------------------------------------------------------------------------
+
+
+class TestCallTaskTimeoutValidation:
+    def test_timeout_below_minimum_raises(self):
+        """timeout_seconds < 30 is rejected by Pydantic."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=29)
+
+    def test_timeout_above_maximum_raises(self):
+        """timeout_seconds > 3600 is rejected by Pydantic."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=3601)
+
+    def test_timeout_at_minimum_accepted(self):
+        """timeout_seconds=30 is the lower bound and should be accepted."""
+        task = CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=30)
+        assert task.timeout_seconds == 30
+
+    def test_timeout_at_maximum_accepted(self):
+        """timeout_seconds=3600 is the upper bound and should be accepted."""
+        task = CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=3600)
+        assert task.timeout_seconds == 3600
+
+    def test_timeout_zero_raises(self):
+        """timeout_seconds=0 is rejected by Pydantic."""
+        from pydantic import ValidationError
+
+        with pytest.raises(ValidationError):
+            CallTask(phone_number="+15551234567", instructions="hi", timeout_seconds=0)

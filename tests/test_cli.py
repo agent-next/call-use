@@ -571,6 +571,16 @@ def test_dial_worker_not_running_shows_actionable_error(mock_run):
     assert "call-use-worker start" in result.output
 
 
+def test_dial_timeout_out_of_range_rejected():
+    """--timeout outside 30-3600 is rejected by Click IntRange."""
+    runner = CliRunner()
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "10"])
+    assert result.exit_code != 0
+
+    result = runner.invoke(main, ["dial", "+18005551234", "-i", "test", "--timeout", "5000"])
+    assert result.exit_code != 0
+
+
 @patch("call_use.cli._run_call")
 def test_dial_other_call_error_shows_generic_message(mock_run):
     """CallError with a non-worker code shows generic error message."""

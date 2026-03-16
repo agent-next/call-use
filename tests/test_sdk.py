@@ -52,6 +52,40 @@ class TestCallAgentConstructor:
                 on_approval=None,
             )
 
+    def test_timeout_below_minimum_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be between 30 and 3600"):
+            CallAgent(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=False,
+                timeout_seconds=29,
+            )
+
+    def test_timeout_above_maximum_raises(self):
+        with pytest.raises(ValueError, match="timeout_seconds must be between 30 and 3600"):
+            CallAgent(
+                phone="+12025551234",
+                instructions="Test",
+                approval_required=False,
+                timeout_seconds=3601,
+            )
+
+    def test_timeout_at_boundaries_accepted(self):
+        agent_low = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+            timeout_seconds=30,
+        )
+        assert agent_low._timeout_seconds == 30
+        agent_high = CallAgent(
+            phone="+12025551234",
+            instructions="Test",
+            approval_required=False,
+            timeout_seconds=3600,
+        )
+        assert agent_high._timeout_seconds == 3600
+
     def test_approval_not_required_no_callback_ok(self):
         agent = CallAgent(
             phone="+12025551234",
@@ -313,7 +347,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,  # Immediate timeout
+            timeout_seconds=30,  # Immediate timeout
         )
 
         mock_room = MagicMock()
@@ -359,7 +393,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=1,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -613,7 +647,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=1,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -678,7 +712,7 @@ class TestCallAgentCallMethod:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=1,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -895,7 +929,7 @@ class TestMalformedCallOutcome:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
@@ -966,7 +1000,7 @@ class TestTokenTTL:
             phone="+12025551234",
             instructions="Test call",
             approval_required=False,
-            timeout_seconds=0,
+            timeout_seconds=30,
         )
 
         mock_room = MagicMock()
