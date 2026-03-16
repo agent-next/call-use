@@ -41,7 +41,7 @@ Structured result returned when a call completes.
 | `events` | `list[CallEvent]` | Complete list of call events |
 | `duration_seconds` | `float` | Total call duration |
 | `disposition` | `DispositionEnum` | How the call ended |
-| `recording_url` | `str \| None` | Recording URL if available |
+| `recording_url` | `str \| None` | Recording URL if available. Reserved for future use. Currently always `None`. |
 | `metadata` | `dict` | Additional metadata (phone number, caller ID) |
 
 ### Transcript entry format
@@ -101,11 +101,11 @@ Call lifecycle states.
 |-------|-------------|
 | `created` | Call task created, not yet dialing |
 | `dialing` | SIP invite sent, waiting for answer |
-| `ringing` | Phone is ringing |
+| `ringing` | Phone is ringing (reserved — not currently emitted) |
 | `connected` | Call connected, agent is active |
-| `in_ivr` | Navigating an automated phone menu |
-| `on_hold` | Placed on hold |
-| `in_conversation` | Speaking with a human |
+| `in_ivr` | Navigating an automated phone menu (reserved — not currently emitted) |
+| `on_hold` | Placed on hold (reserved — not currently emitted) |
+| `in_conversation` | Speaking with a human (reserved — not currently emitted) |
 | `awaiting_approval` | Agent paused, waiting for human approval |
 | `human_takeover` | Human has taken over the call |
 | `ended` | Call has ended |
@@ -127,6 +127,7 @@ How a call ended.
 | `voicemail` | Reached voicemail |
 | `timeout` | Call exceeded the timeout limit |
 | `cancelled` | Call was cancelled |
+| `error` | Internal error during call processing |
 
 ### CallEventType
 
@@ -167,3 +168,5 @@ Error classifications.
 | `provider_error` | SIP/Twilio provider error |
 | `rate_limited` | Rate limit exceeded |
 | `cancelled` | Call was cancelled |
+| `worker_not_running` | No worker process available to handle the call |
+| `configuration_error` | Required environment variables are missing |
