@@ -55,6 +55,7 @@ class DispositionEnum(str, Enum):
     voicemail = "voicemail"
     timeout = "timeout"
     cancelled = "cancelled"
+    error = "error"
 
 
 class CallEventType(str, Enum):

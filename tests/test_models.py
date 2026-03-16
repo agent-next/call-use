@@ -91,9 +91,10 @@ class TestEnums:
             "voicemail",
             "timeout",
             "cancelled",
+            "error",
         }
         assert {e.value for e in DispositionEnum} == expected
-        assert len(DispositionEnum) == 7
+        assert len(DispositionEnum) == 8
 
     def test_call_event_type_values(self):
         expected = {

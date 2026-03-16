@@ -107,14 +107,31 @@ class CallAgent:
             if dp.topic != "call-events":
                 return
             event_data = json.loads(dp.data.decode("utf-8"))
-            event = CallEvent(**event_data)
+            try:
+                event = CallEvent(**event_data)
+            except (TypeError, ValueError) as exc:
+                logger.error("Failed to parse CallEvent (raw data: %s): %s", event_data, exc)
+                return
 
             if self._on_event:
                 loop = asyncio.get_running_loop()
                 loop.run_in_executor(None, self._on_event, event)
 
             if event.type == CallEventType.call_complete:
-                outcome_holder[0] = CallOutcome(**event.data)
+                try:
+                    outcome_holder[0] = CallOutcome(**event.data)
+                except (TypeError, ValueError) as exc:
+                    logger.error(
+                        "Failed to parse CallOutcome (raw data: %s): %s",
+                        event.data, exc, exc_info=True,
+                    )
+                    outcome_holder[0] = CallOutcome(
+                        task_id=event.data.get("task_id", "unknown") if isinstance(event.data, dict) else "unknown",
+                        transcript=[],
+                        events=[],
+                        duration_seconds=0,
+                        disposition=DispositionEnum.error,
+                    )
                 call_complete.set()
                 return
 
