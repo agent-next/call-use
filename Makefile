@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-bdd test-integration lint format typecheck build check clean security docs docs-build
+.PHONY: test test-unit test-bdd test-integration lint format typecheck build check clean security docs docs-build publish
 
 test:
 	pytest tests/ -v --tb=short --cov=call_use --cov-report=term-missing --cov-fail-under=100
@@ -40,3 +40,6 @@ docs:
 
 docs-build:
 	mkdocs build
+
+publish: check
+	twine upload dist/*
