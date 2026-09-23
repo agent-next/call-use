@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <!-- Rounded square background -->
+  <rect x="16" y="16" width="480" height="480" rx="96" fill="url(#grad)"/>
+  <!-- Phone handset integrated with code brackets -->
+  <!-- Left bracket < -->
+  <path d="M128 176 L88 256 L128 336" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+  <!-- Right bracket > -->
+  <path d="M384 176 L424 256 L384 336" stroke="#FFFFFF" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+  <!-- Stylized phone handset — minimal, modern -->
+  <path d="M176 160 C176 148 186 136 200 136 L224 136 C236 136 244 146 244 158 L244 200 C244 214 234 224 220 224 L208 224 C196 224 188 232 188 244 L188 268 C188 280 196 288 208 288 L220 288 C234 288 244 298 244 312 L244 354 C244 366 236 376 224 376 L200 376 C186 376 176 364 176 352 Z" fill="#FFFFFF"/>
+  <!-- Signal waves emanating from handset -->
+  <path d="M280 208 C308 228 308 284 280 304" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" fill="none"/>
+  <path d="M312 176 C356 208 356 304 312 336" stroke="#FFFFFF" stroke-width="22" stroke-linecap="round" fill="none" opacity="0.7"/>
+</svg>

@@ -1,0 +1,75 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #0a0a0f;
+  --color-bg-secondary: #12121a;
+  --color-bg-tertiary: #1a1a2e;
+  --color-bg-card: #16162a;
+  --color-border-subtle: #2a2a4a;
+  --color-accent: #6366f1;
+  --color-accent-light: #818cf8;
+  --color-accent-glow: #6366f180;
+  --color-text-primary: #f1f5f9;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
+  --color-green: #22c55e;
+  --color-green-dim: #22c55e40;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Code block syntax highlighting */
+.code-keyword { color: #c084fc; }
+.code-string { color: #34d399; }
+.code-function { color: #60a5fa; }
+.code-comment { color: #64748b; }
+.code-variable { color: #f1f5f9; }
+.code-operator { color: #94a3b8; }
+.code-number { color: #fbbf24; }
+.code-builtin { color: #f472b6; }
+.code-property { color: #67e8f9; }
+
+/* Tab active indicator */
+.tab-active {
+  background-color: var(--color-bg-tertiary);
+  color: var(--color-accent-light);
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.tab-inactive {
+  color: var(--color-text-muted);
+  border-bottom: 2px solid transparent;
+}
+
+.tab-inactive:hover {
+  color: var(--color-text-secondary);
+}
+
+/* Gradient text */
+.gradient-text {
+  background: linear-gradient(135deg, #6366f1, #a78bfa, #818cf8);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glow effect */
+.glow-border {
+  box-shadow: 0 0 30px var(--color-accent-glow), inset 0 1px 0 rgba(255,255,255,0.05);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: var(--color-bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--color-border-subtle); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-text-muted); }

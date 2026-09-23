@@ -1,0 +1,37 @@
+---
+const integrations = [
+  { name: "Claude Code", desc: "via MCP Server" },
+  { name: "LangChain", desc: "via Python SDK" },
+  { name: "OpenAI Agents SDK", desc: "via Python SDK" },
+  { name: "CrewAI", desc: "via Python SDK" },
+  { name: "Any Bash Agent", desc: "via CLI" },
+  { name: "Any HTTP Client", desc: "via REST API" },
+];
+---
+
+<section class="relative py-24 sm:py-32">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto mb-16 max-w-2xl text-center">
+      <h2 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+        Works with <span class="gradient-text">your stack</span>
+      </h2>
+      <p class="text-lg text-text-secondary">
+        Integrates with any AI framework or agent runtime through four flexible interfaces.
+      </p>
+    </div>
+
+    <div class="mx-auto grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {integrations.map((item) => (
+        <div class="flex items-center gap-4 rounded-xl border border-border-subtle bg-bg-secondary/50 px-5 py-4 transition-all hover:border-accent/30">
+          <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent/10 text-accent-light font-bold text-sm">
+            {item.name.charAt(0)}
+          </div>
+          <div>
+            <p class="font-semibold text-text-primary">{item.name}</p>
+            <p class="text-xs text-text-muted">{item.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>

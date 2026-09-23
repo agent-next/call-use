@@ -1,0 +1,60 @@
+---
+const rows = [
+  { feature: "Make a phone call", calluse: "3 lines", scratch: "months", pineai: "pay per task" },
+  { feature: "IVR navigation", calluse: "built-in", scratch: "weeks", pineai: "built-in" },
+  { feature: "Human takeover", calluse: "built-in", scratch: "weeks", pineai: false },
+  { feature: "Approval flow", calluse: "built-in", scratch: "weeks", pineai: false },
+  { feature: "Open source", calluse: true, scratch: false, pineai: false },
+  { feature: "Self-hostable", calluse: true, scratch: false, pineai: false },
+  { feature: "Multiple interfaces", calluse: "4", scratch: "DIY", pineai: "3+" },
+];
+
+function renderCell(value: string | boolean) {
+  if (value === true) return { text: "Yes", class: "text-green font-medium" };
+  if (value === false) return { text: "--", class: "text-text-muted" };
+  return { text: value, class: "text-text-secondary" };
+}
+---
+
+<section class="relative py-24 sm:py-32">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto mb-16 max-w-2xl text-center">
+      <h2 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+        Why <span class="gradient-text">call-use</span>
+      </h2>
+      <p class="text-lg text-text-secondary">
+        Stop rebuilding phone infrastructure. Get to production in minutes, not months.
+      </p>
+    </div>
+
+    <div class="mx-auto max-w-4xl overflow-x-auto">
+      <table class="w-full min-w-[600px]">
+        <thead>
+          <tr class="border-b border-border-subtle">
+            <th class="px-4 py-4 text-left text-sm font-medium text-text-muted"></th>
+            <th class="px-4 py-4 text-center">
+              <span class="text-sm font-bold text-accent-light">call-use</span>
+            </th>
+            <th class="px-4 py-4 text-center text-sm font-medium text-text-muted">Build from scratch</th>
+            <th class="px-4 py-4 text-center text-sm font-medium text-text-muted">Pine AI</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => {
+            const cu = renderCell(row.calluse);
+            const sc = renderCell(row.scratch);
+            const pi = renderCell(row.pineai);
+            return (
+              <tr class="border-b border-border-subtle/50 transition-colors hover:bg-bg-secondary/30">
+                <td class="px-4 py-3.5 text-sm font-medium text-text-primary">{row.feature}</td>
+                <td class={`px-4 py-3.5 text-center text-sm ${cu.class}`}>{cu.text}</td>
+                <td class={`px-4 py-3.5 text-center text-sm ${sc.class}`}>{sc.text}</td>
+                <td class={`px-4 py-3.5 text-center text-sm ${pi.class}`}>{pi.text}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
