@@ -1,0 +1,63 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" fill="none">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F172A" />
+      <stop offset="100%" style="stop-color:#1E293B" />
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1" />
+      <stop offset="100%" style="stop-color:#8B5CF6" />
+    </linearGradient>
+    <!-- Subtle grid pattern -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#334155" stroke-width="0.5" opacity="0.3"/>
+    </pattern>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600;700&amp;family=Inter:wght@400;500&amp;display=swap');
+    .title { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 72px; }
+    .tagline { font-family: 'Inter', sans-serif; font-weight: 400; font-size: 28px; }
+    .url { font-family: 'JetBrains Mono', monospace; font-weight: 500; font-size: 20px; }
+  </style>
+
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#grid)"/>
+
+  <!-- Accent bar at top -->
+  <rect width="1200" height="4" fill="url(#accent)"/>
+
+  <!-- Logo icon (scaled up) -->
+  <g transform="translate(80, 160)">
+    <rect width="140" height="140" rx="28" fill="url(#accent)"/>
+    <path d="M37 51 L22 70 L37 98" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+    <path d="M103 51 L118 70 L103 98" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+    <path d="M51 45 C51 42 53.5 38 57.5 38 L65 38 C68 38 70 40.5 70 43.5 L70 55 C70 58.8 67 61.5 63 61.5 L60 61.5 C57 61.5 55 64 55 67 L55 73 C55 76 57 78.5 60 78.5 L63 78.5 C67 78.5 70 81.2 70 85 L70 96.5 C70 99.5 68 102 65 102 L57.5 102 C53.5 102 51 98 51 95 Z" fill="#FFFFFF"/>
+    <path d="M80 58 C88 63.5 88 86.5 80 92" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" fill="none"/>
+    <path d="M90 48 C102 57 102 93 90 102" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" fill="none" opacity="0.7"/>
+  </g>
+
+  <!-- Title -->
+  <text x="260" y="218" class="title" fill="#818CF8">call</text>
+  <text x="430" y="218" class="title" fill="#64748B">-</text>
+  <text x="462" y="218" class="title" fill="#F1F5F9">use</text>
+
+  <!-- Tagline -->
+  <text x="260" y="272" class="tagline" fill="#94A3B8">The browser-use for phones</text>
+
+  <!-- Description -->
+  <text x="80" y="380" class="tagline" fill="#64748B">Open-source outbound call-control runtime for AI agents.</text>
+  <text x="80" y="420" class="tagline" fill="#64748B">Give your AI agent the ability to make phone calls.</text>
+
+  <!-- Code snippet hint -->
+  <rect x="80" y="460" width="500" height="48" rx="8" fill="#1E293B" stroke="#334155" stroke-width="1"/>
+  <text x="100" y="491" class="url" fill="#64748B">$</text>
+  <text x="120" y="491" class="url" fill="#94A3B8">pip install</text>
+  <text x="290" y="491" class="url" fill="#818CF8">call-use</text>
+
+  <!-- URL -->
+  <text x="80" y="580" class="url" fill="#475569">call-use.com</text>
+
+  <!-- GitHub badge -->
+  <text x="1020" y="580" class="url" fill="#475569">agent-next</text>
+</svg>

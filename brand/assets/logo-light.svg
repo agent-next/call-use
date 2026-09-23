@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 120" fill="none">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#8B5CF6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@600&amp;display=swap');
+    .wordmark { font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace; font-weight: 600; font-size: 52px; }
+  </style>
+  <!-- Icon -->
+  <g transform="translate(0, 0)">
+    <rect x="4" y="4" width="112" height="112" rx="22" fill="url(#grad)"/>
+    <path d="M30 41 L18 60 L30 79" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+    <path d="M90 41 L102 60 L90 79" stroke="#FFFFFF" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round" fill="none" opacity="0.6"/>
+    <path d="M41 37 C41 34 43.5 31 47 31 L53 31 C55.8 31 57.5 33.5 57.5 36 L57.5 46 C57.5 49.3 55 51.7 51.5 51.7 L48.7 51.7 C46 51.7 44 53.7 44 56.5 L44 63.5 C44 66.3 46 68.3 48.7 68.3 L51.5 68.3 C55 68.3 57.5 70.7 57.5 74 L57.5 84 C57.5 86.5 55.8 89 53 89 L47 89 C43.5 89 41 86 41 83 Z" fill="#FFFFFF"/>
+    <path d="M66 48 C72.5 53 72.5 67 66 72" stroke="#FFFFFF" stroke-width="5.2" stroke-linecap="round" fill="none"/>
+    <path d="M73.5 40.5 C84 48 84 72 73.5 79.5" stroke="#FFFFFF" stroke-width="5.2" stroke-linecap="round" fill="none" opacity="0.7"/>
+  </g>
+  <!-- Wordmark — dark text for light backgrounds -->
+  <text x="140" y="76" class="wordmark" fill="#6366F1">call</text>
+  <text x="276" y="76" class="wordmark" fill="#94A3B8">-</text>
+  <text x="300" y="76" class="wordmark" fill="#0F172A">use</text>
+</svg>
