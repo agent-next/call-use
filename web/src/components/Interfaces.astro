@@ -1,0 +1,121 @@
+---
+const sdkCode = `<span class="code-keyword">from</span> <span class="code-variable">call_use</span> <span class="code-keyword">import</span> <span class="code-function">CallAgent</span>
+
+<span class="code-keyword">async def</span> <span class="code-function">cancel_subscription</span><span class="code-operator">():</span>
+    <span class="code-variable">agent</span> <span class="code-operator">=</span> <span class="code-function">CallAgent</span><span class="code-operator">(</span>
+        <span class="code-property">phone</span><span class="code-operator">=</span><span class="code-string">"+18001234567"</span><span class="code-operator">,</span>
+        <span class="code-property">instructions</span><span class="code-operator">=</span><span class="code-string">"Cancel my subscription"</span><span class="code-operator">,</span>
+        <span class="code-property">on_event</span><span class="code-operator">=</span><span class="code-keyword">lambda</span> <span class="code-variable">e</span><span class="code-operator">:</span> <span class="code-builtin">print</span><span class="code-operator">(</span><span class="code-variable">e</span><span class="code-operator">)</span>
+    <span class="code-operator">)</span>
+    <span class="code-variable">outcome</span> <span class="code-operator">=</span> <span class="code-keyword">await</span> <span class="code-variable">agent</span><span class="code-operator">.</span><span class="code-function">call</span><span class="code-operator">()</span>
+    <span class="code-builtin">print</span><span class="code-operator">(</span><span class="code-variable">outcome</span><span class="code-operator">.</span><span class="code-property">transcript</span><span class="code-operator">)</span>
+    <span class="code-builtin">print</span><span class="code-operator">(</span><span class="code-variable">outcome</span><span class="code-operator">.</span><span class="code-property">disposition</span><span class="code-operator">)</span>  <span class="code-comment"># "completed"</span>`;
+
+const cliCode = `<span class="code-comment"># Make a call with a single command</span>
+<span class="code-text-muted">$</span> <span class="code-function">call-use</span> dial <span class="code-string">"+18001234567"</span> \\
+    <span class="code-operator">-i</span> <span class="code-string">"Ask about store hours"</span>
+
+<span class="code-comment"># Stream events in real-time</span>
+<span class="code-text-muted">$</span> <span class="code-function">call-use</span> dial <span class="code-string">"+18001234567"</span> \\
+    <span class="code-operator">-i</span> <span class="code-string">"Cancel my subscription"</span> \\
+    <span class="code-operator">--stream</span>
+
+<span class="code-comment"># Start the worker process</span>
+<span class="code-text-muted">$</span> <span class="code-function">call-use</span> worker start`;
+
+const mcpCode = `<span class="code-operator">&#123;</span>
+  <span class="code-property">"mcpServers"</span><span class="code-operator">:</span> <span class="code-operator">&#123;</span>
+    <span class="code-property">"call-use"</span><span class="code-operator">:</span> <span class="code-operator">&#123;</span>
+      <span class="code-property">"command"</span><span class="code-operator">:</span> <span class="code-string">"uvx"</span><span class="code-operator">,</span>
+      <span class="code-property">"args"</span><span class="code-operator">:</span> <span class="code-operator">[</span><span class="code-string">"call-use"</span><span class="code-operator">,</span> <span class="code-string">"mcp"</span><span class="code-operator">]</span>
+    <span class="code-operator">&#125;</span>
+  <span class="code-operator">&#125;</span>
+<span class="code-operator">&#125;</span>`;
+
+const restCode = `<span class="code-comment"># Start the REST API server</span>
+<span class="code-text-muted">$</span> <span class="code-function">call-use</span> serve
+
+<span class="code-comment"># Make a call via HTTP</span>
+<span class="code-text-muted">$</span> <span class="code-function">curl</span> <span class="code-operator">-X</span> POST http://localhost:8000/calls \\
+    <span class="code-operator">-H</span> <span class="code-string">"Content-Type: application/json"</span> \\
+    <span class="code-operator">-d</span> <span class="code-string">'&#123;
+      "phone": "+18001234567",
+      "instructions": "Ask about store hours"
+    &#125;'</span>
+
+<span class="code-comment"># Response</span>
+<span class="code-operator">&#123;</span>
+  <span class="code-property">"call_id"</span><span class="code-operator">:</span> <span class="code-string">"call_abc123"</span><span class="code-operator">,</span>
+  <span class="code-property">"status"</span><span class="code-operator">:</span> <span class="code-string">"in_progress"</span>
+<span class="code-operator">&#125;</span>`;
+
+const tabs = [
+  { id: "sdk", label: "Python SDK", file: "agent.py", code: sdkCode },
+  { id: "cli", label: "CLI", file: "terminal", code: cliCode },
+  { id: "mcp", label: "MCP Server", file: "claude_desktop_config.json", code: mcpCode },
+  { id: "rest", label: "REST API", file: "terminal", code: restCode },
+];
+---
+
+<section id="interfaces" class="relative py-24 sm:py-32 bg-bg-secondary/30">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto mb-16 max-w-2xl text-center">
+      <h2 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+        Four interfaces, <span class="gradient-text">one runtime</span>
+      </h2>
+      <p class="text-lg text-text-secondary">
+        Use call-use however it fits your workflow. Every interface shares the same powerful engine.
+      </p>
+    </div>
+
+    <div class="mx-auto max-w-3xl">
+      <div class="mb-0 flex overflow-x-auto border-b border-border-subtle" role="tablist">
+        {tabs.map((tab, i) => (
+          <button
+            data-tab={tab.id}
+            role="tab"
+            aria-selected={i === 0 ? "true" : "false"}
+            class:list={[
+              "shrink-0 px-5 py-3 text-sm font-medium transition-colors",
+              i === 0 ? "tab-active" : "tab-inactive"
+            ]}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div class="overflow-hidden rounded-b-xl border border-t-0 border-border-subtle">
+        {tabs.map((tab, i) => (
+          <div id={`panel-${tab.id}`} class:list={["tab-panel", i !== 0 && "hidden"]} role="tabpanel">
+            <div class="flex items-center gap-2 border-b border-border-subtle bg-bg-secondary/80 px-4 py-3">
+              <span class="text-xs text-text-muted font-mono">{tab.file}</span>
+            </div>
+            <pre class="overflow-x-auto bg-bg-secondary/40 p-5 font-mono text-sm leading-relaxed"><code><Fragment set:html={tab.code} /></code></pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</section>
+
+<script>
+  const buttons = document.querySelectorAll('[data-tab]');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  buttons.forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      const tab = btn.getAttribute('data-tab');
+      buttons.forEach(function(b) {
+        b.classList.remove('tab-active');
+        b.classList.add('tab-inactive');
+        b.setAttribute('aria-selected', 'false');
+      });
+      btn.classList.remove('tab-inactive');
+      btn.classList.add('tab-active');
+      btn.setAttribute('aria-selected', 'true');
+      panels.forEach(function(p) { p.classList.add('hidden'); });
+      document.getElementById('panel-' + tab)?.classList.remove('hidden');
+    });
+  });
+</script>

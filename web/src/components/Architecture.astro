@@ -1,0 +1,109 @@
+---
+---
+
+<section id="architecture" class="relative py-24 sm:py-32 bg-bg-secondary/30">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto mb-16 max-w-2xl text-center">
+      <h2 class="mb-4 text-3xl font-bold tracking-tight sm:text-4xl">
+        How it <span class="gradient-text">works</span>
+      </h2>
+      <p class="text-lg text-text-secondary">
+        A two-process architecture that keeps your agent code separate from the real-time voice pipeline.
+      </p>
+    </div>
+
+    <!-- Architecture diagram -->
+    <div class="mx-auto max-w-4xl">
+      <div class="overflow-hidden rounded-xl border border-border-subtle bg-bg-secondary/50 p-6 sm:p-10">
+        <!-- Flow diagram -->
+        <div class="flex flex-col items-center gap-3 sm:flex-row sm:gap-0 sm:justify-between">
+          <!-- Your Code -->
+          <div class="flex flex-col items-center">
+            <div class="rounded-xl border-2 border-accent bg-accent/10 px-6 py-4 text-center">
+              <p class="text-sm font-bold text-accent-light">Your Code</p>
+              <p class="mt-1 text-xs text-text-muted">SDK / CLI / MCP / REST</p>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden sm:flex items-center text-text-muted">
+            <div class="h-px w-8 bg-border-subtle"></div>
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div class="sm:hidden text-text-muted">
+            <svg class="h-4 w-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+
+          <!-- LiveKit -->
+          <div class="flex flex-col items-center">
+            <div class="rounded-xl border border-border-subtle bg-bg-tertiary px-6 py-4 text-center">
+              <p class="text-sm font-bold text-text-primary">LiveKit Cloud</p>
+              <p class="mt-1 text-xs text-text-muted">Real-time voice</p>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden sm:flex items-center text-text-muted">
+            <div class="h-px w-8 bg-border-subtle"></div>
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div class="sm:hidden text-text-muted">
+            <svg class="h-4 w-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+
+          <!-- Twilio -->
+          <div class="flex flex-col items-center">
+            <div class="rounded-xl border border-border-subtle bg-bg-tertiary px-6 py-4 text-center">
+              <p class="text-sm font-bold text-text-primary">Twilio SIP</p>
+              <p class="mt-1 text-xs text-text-muted">Phone connectivity</p>
+            </div>
+          </div>
+
+          <!-- Arrow -->
+          <div class="hidden sm:flex items-center text-text-muted">
+            <div class="h-px w-8 bg-border-subtle"></div>
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+          <div class="sm:hidden text-text-muted">
+            <svg class="h-4 w-4 rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+            </svg>
+          </div>
+
+          <!-- PSTN -->
+          <div class="flex flex-col items-center">
+            <div class="rounded-xl border border-green/50 bg-green-dim px-6 py-4 text-center">
+              <p class="text-sm font-bold text-green">PSTN</p>
+              <p class="mt-1 text-xs text-text-muted">Phone network</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Worker callout -->
+        <div class="mt-8 flex items-start gap-3 rounded-lg border border-border-subtle bg-bg-primary/50 p-4">
+          <div class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-accent/20">
+            <svg class="h-3.5 w-3.5 text-accent-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-text-primary">Two-process model</p>
+            <p class="mt-1 text-sm text-text-secondary">
+              The <code class="rounded bg-bg-tertiary px-1.5 py-0.5 font-mono text-xs text-accent-light">call-use worker</code> runs alongside LiveKit, handling real-time voice interaction, IVR navigation, and DTMF tones. Your application code connects through any of the four interfaces and receives structured events and outcomes.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
