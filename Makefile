@@ -1,3 +1,7 @@
+# Prefer the project venv for every tool invocation so `make setup`/`make check`
+# never touch the host, conda, or user-site Python.
+export PATH := $(CURDIR)/.venv/bin:$(PATH)
+
 .PHONY: test test-unit test-bdd test-integration lint format typecheck build check clean security docs docs-build
 
 test:
@@ -11,6 +15,11 @@ test-bdd:
 
 test-integration:
 	pytest tests/ -v -m integration --tb=short
+
+.PHONY: setup
+setup:
+	@[ -n "$$VIRTUAL_ENV" ] || [ -d .venv ] || python3 -m venv .venv
+	python3 -m pip install -e ".[dev]" ruff build twine
 
 lint:
 	ruff check call_use/ tests/
