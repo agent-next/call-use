@@ -45,8 +45,10 @@ site/
 # KMS keys and secrets
 KMS/
 
-# Claude / Skill configs (project-local, not for source control)
+# Claude / Skill configs (CLAUDE.md is committed as the canonical agent
+# entrypoint; machine-local overrides stay ignored)
 CLAUDE.md
+!CLAUDE.md
 SKILL.md
 
 # Test and coverage artifacts

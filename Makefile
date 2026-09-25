@@ -2,6 +2,10 @@
 # never touch the host, conda, or user-site Python.
 export PATH := $(CURDIR)/.venv/bin:$(PATH)
 
+# uv is resolved once at parse time; `make setup` installs it to ~/.local/bin
+# (via the astral installer) when it is missing, so this fallback path is used.
+UV := $(shell command -v uv 2>/dev/null || echo "$(HOME)/.local/bin/uv")
+
 .PHONY: test test-unit test-bdd test-integration lint format typecheck build check clean security docs docs-build
 
 test:
@@ -18,8 +22,9 @@ test-integration:
 
 .PHONY: setup
 setup:
-	@[ -n "$$VIRTUAL_ENV" ] || [ -d .venv ] || python3 -m venv .venv
-	python3 -m pip install -e ".[dev]" ruff build twine
+	@command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh
+	$(UV) sync --extra dev
+	$(UV) pip install --python .venv/bin/python ruff build twine
 
 lint:
 	ruff check call_use/ tests/

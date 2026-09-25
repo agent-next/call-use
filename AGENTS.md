@@ -19,11 +19,13 @@ shared files like `Makefile` or `README.md`.
 
 ## Setup
 
-`make setup` creates `.venv/` when no virtualenv is active (the Makefile
-prepends `.venv/bin` to PATH, so host/conda Python is never touched), then runs
-`python3 -m pip install -e ".[dev]" ruff build twine` — the package editable
-with dev extras plus the lint/build tools `make check` needs that live outside
-the `dev` extra. Requires Python >= 3.11.
+`make setup` installs `uv` to `~/.local/bin` when missing, then runs
+`uv sync --extra dev` — the tracked `uv.lock` is the known-good env (fresh pip
+resolution currently produces a broken dep set). uv always creates and installs
+into the project `.venv/`, even when another virtualenv is active; the Makefile
+prepends `.venv/bin` to PATH so host/conda Python is never touched. It also
+installs the lint/build tools `make check` needs (`ruff build twine`, which
+live outside the `dev` extra) into `.venv`. Requires Python >= 3.11.
 
 ## Check
 
@@ -44,7 +46,9 @@ network or credentials needed.
   agent, examples, or `web/` demo against live credentials.
 - Coverage is CI-enforced at 100% — new code needs tests or the `test` job
   fails.
-- Do not edit `.github/workflows/` in baseline/style PRs; CI is stable.
+- CI on main is currently red for dependency drift (fresh pip resolves a broken
+  dep set; `uv.lock` is the known-good env). Do not edit `.github/workflows/`
+  in baseline PRs.
 
 ## Done
 
