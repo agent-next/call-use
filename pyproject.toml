@@ -86,3 +86,11 @@ python_version = "3.11"
 warn_return_any = true
 warn_unused_configs = true
 ignore_missing_imports = true
+
+# numpy>=2.5 stubs use PEP 695 `type` statements (3.12+ syntax) that mypy cannot
+# parse while checking at the 3.11 floor; call_use has no numpy imports, so the
+# stubs can be skipped entirely.
+[[tool.mypy.overrides]]
+module = ["numpy", "numpy.*"]
+follow_imports = "skip"
+follow_imports_for_stubs = true
