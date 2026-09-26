@@ -20,7 +20,7 @@ from livekit.api import (
     LiveKitAPI,
     SendDataRequest,
 )
-from mcp.server import FastMCP
+from mcp.server.fastmcp import FastMCP
 
 from call_use.models import CallError, CallErrorCode
 from call_use.phone import validate_caller_id, validate_phone_number

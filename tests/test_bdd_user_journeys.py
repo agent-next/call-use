@@ -723,7 +723,7 @@ class TestSDKProgrammaticUsageBDD:
         with pytest.raises(RuntimeError, match="No active call"):
             import asyncio
 
-            asyncio.get_event_loop().run_until_complete(agent.cancel())
+            asyncio.run(agent.cancel())
 
     def test_journey_sdk_takeover_without_active_call_raises(self):
         """Given no active call, when takeover(), then RuntimeError raised."""
@@ -737,7 +737,7 @@ class TestSDKProgrammaticUsageBDD:
         with pytest.raises(RuntimeError, match="No active call"):
             import asyncio
 
-            asyncio.get_event_loop().run_until_complete(agent.takeover())
+            asyncio.run(agent.takeover())
 
     def test_journey_sdk_outcome_fields_accessible(self):
         """Given completed call, when outcome returned, then all fields accessible."""
