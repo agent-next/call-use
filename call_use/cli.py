@@ -211,11 +211,11 @@ def _doctor_env_vars() -> dict[str, str]:
 def _check_livekit_connectivity() -> tuple[bool, str]:
     """Try to list rooms on LiveKit. Returns (ok, message)."""
     try:
-        from livekit.api import LiveKitAPI
+        from livekit.api import ListRoomsRequest, LiveKitAPI
 
         async def _probe():
             async with LiveKitAPI() as lkapi:
-                await lkapi.room.list_rooms()
+                await lkapi.room.list_rooms(ListRoomsRequest())
 
         asyncio.run(_probe())
         return True, "LiveKit connection OK"
